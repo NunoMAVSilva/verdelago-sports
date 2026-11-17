@@ -1,0 +1,260 @@
+// Painel da receção (#/rececao): login, grelha do dia, reservas/bloqueios, cacifos.
+import { sb, $, $$, esc, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, carregarBase, erroTexto, toast, dialogo, confirmar, grelha, LOGO } from './core.js';
+
+let B = null, dia = hoje(), aba = 'grelha', itens = [], cacifos = [], usosAtivos = [], porPreparar = [], app = null, staffNome = '';
+
+export async function paginaRececao(el) {
+  app = el;
+  document.documentElement.lang = 'pt';
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return login();
+  const { data: ok, error } = await sb.rpc('e_staff');
+  if (error || !ok) {
+    app.innerHTML = topo() + `<main><div class="card vazio stack"><p>Esta conta não tem acesso ao painel da receção.</p><div><button class="btn ghost" id="b-sair">Sair</button></div></div></main>`;
+    $('#b-sair').onclick = sair; return;
+  }
+  const { data: st } = await sb.from('staff').select('nome').eq('user_id', session.user.id).maybeSingle();
+  staffNome = st?.nome || session.user.email;
+  try { B = await carregarBase(); } catch (e) { toast(erroTexto(e), 'erro'); return; }
+  await recarregar();
+}
+function topo(extra = '') {
+  return `<header class="top"><div class="brand">${LOGO}<div><div class="eyebrow">Verdelago · Sports Center</div><div class="tname">Receção</div></div></div><div class="top-r">${extra}</div></header>`;
+}
+function login() {
+  app.innerHTML = topo() + `<main><form class="card stack login" id="f-login"><h2>Entrar</h2>
+    <label class="f" for="l-email">Email<input id="l-email" name="email" type="email" required autocomplete="username"></label>
+    <label class="f" for="l-pass">Palavra-passe<input id="l-pass" name="pass" type="password" required autocomplete="current-password"></label>
+    <div class="row end"><button class="btn">Entrar</button></div></form></main>`;
+  $('#f-login').onsubmit = async e => {
+    e.preventDefault();
+    const f = e.target.elements;
+    const { error } = await sb.auth.signInWithPassword({ email: f.email.value.trim(), password: f.pass.value });
+    if (error) { toast(/invalid/i.test(error.message) ? 'Email ou palavra-passe errados.' : erroTexto(error), 'erro'); return; }
+    paginaRececao(app);
+  };
+}
+async function sair() { await sb.auth.signOut(); login(); }
+
+async function recarregar() {
+  const ini = lisboa(dia, 0).toISOString(), fim = lisboa(addDias(dia, 1), 0).toISOString();
+  const agora = new Date().toISOString(), ate = lisboa(addDias(hoje(), 2), 0).toISOString();
+  const [r, c, u, p] = await Promise.all([
+    sb.from('reservas').select('*, cacifo_usos(*)').eq('estado', 'confirmada').lt('inicio', fim).gt('fim', ini).order('inicio'),
+    sb.from('cacifos').select('*').order('id'),
+    sb.from('cacifo_usos').select('*, reservas(id, espaco_id, inicio, fim, quarto, apelido, nome, telefone, token)').eq('estado', 'preparado').order('cacifo_id'),
+    sb.from('reservas').select('*, cacifo_usos(id, estado)').eq('estado', 'confirmada').eq('precisa_material', true).gt('fim', agora).lt('inicio', ate).order('inicio'),
+  ]);
+  const err = r.error || c.error || u.error || p.error;
+  if (err) { toast(erroTexto(err), 'erro'); return; }
+  itens = r.data; cacifos = c.data; usosAtivos = u.data;
+  porPreparar = p.data.filter(x => !x.cacifo_usos.some(k => k.estado === 'preparado'));
+  desenhar();
+}
+const nomeEsp = id => B.espacos.find(e => e.id === id)?.nome || id;
+const usoAtivo = r => (r.cacifo_usos || []).find(u => u.estado === 'preparado');
+function rotulo(r) {
+  if (r.tipo === 'reserva') return `Q${r.quarto} ${r.apelido}`;
+  if (r.tipo === 'torneio') return r.motivo || 'Torneio';
+  return r.motivo || 'Bloqueado';
+}
+function extra(r) {
+  const u = usoAtivo(r);
+  if (u) return `🔒 Cacifo ${u.cacifo_id}`;
+  if (r.precisa_material) return '🎒 Material por preparar';
+  return r.origem === 'rececao' && r.tipo === 'reserva' ? 'pela receção' : '';
+}
+
+function desenhar() {
+  const tabs = [['grelha', 'Grelha do dia'], ['cacifos', `Cacifos e material${porPreparar.length ? ` (${porPreparar.length})` : ''}`]];
+  app.innerHTML = topo(`<span class="pill">${esc(staffNome)}</span><button class="btn small on-dark" id="b-sair">Sair</button>`) +
+    `<nav class="tabs">${tabs.map(([k, l]) => `<a href="#/rececao" data-aba="${k}" class="${k === aba ? 'on' : ''}">${esc(l)}</a>`).join('')}<a class="tvlink" href="#/tv" target="_blank" rel="noopener">Ecrã TV ↗</a><a href="#/" target="_blank" rel="noopener">Página dos hóspedes ↗</a></nav>
+    <main class="largo">${aba === 'grelha' ? vGrelha() : vCacifos()}</main>`;
+  $('#b-sair').onclick = sair;
+  $$('[data-aba]').forEach(a => a.onclick = e => { e.preventDefault(); aba = a.dataset.aba; desenhar(); });
+  if (aba === 'grelha') ligarGrelha(); else ligarCacifos();
+}
+
+/* ---------- grelha ---------- */
+function vGrelha() {
+  const n = itens.filter(r => r.tipo === 'reserva').length;
+  return `<div class="row between">
+      <div class="row"><button class="btn ghost small" data-dia="-1" aria-label="Dia anterior">◀</button><button class="btn ghost small" data-dia="0">Hoje</button><button class="btn ghost small" data-dia="1" aria-label="Dia seguinte">▶</button>
+      <input type="date" id="g-dia" value="${dia}" aria-label="Dia"><h2 class="cap">${esc(dataLonga(dia))}</h2></div>
+      <div class="row"><span class="muted small">${n} reserva${n === 1 ? '' : 's'}</span><button class="btn small" id="b-novo">+ Reserva / bloqueio</button><button class="btn ghost small" id="b-rec">Atualizar</button></div>
+    </div>
+    <p class="small muted" style="margin:0">Toque num espaço livre para reservar ou bloquear; toque numa reserva para ver detalhes, cancelar ou preparar cacifo.</p>
+    ${grelha({ espacos: B.espacos, dia, itens: itens.map(r => ({ ...r, label: rotulo(r), extra: esc(extra(r)) })), clicavel: true })}`;
+}
+function ligarGrelha() {
+  $$('[data-dia]').forEach(b => b.onclick = () => { const d = +b.dataset.dia; dia = d === 0 ? hoje() : addDias(dia, d); recarregar(); });
+  $('#g-dia').onchange = e => { if (e.target.value) { dia = e.target.value; recarregar(); } };
+  $('#b-rec').onclick = recarregar;
+  $('#b-novo').onclick = () => novo(B.espacos[0].id, null);
+  const ativar = (sel, fn) => $$(sel).forEach(td => { td.onclick = () => fn(td); td.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(td); } }; });
+  ativar('[data-livre]', td => novo(td.dataset.livre, +td.dataset.min));
+  ativar('[data-item]', td => detalhe(itens.find(r => r.id === td.dataset.item)));
+}
+
+/* ---------- nova reserva / bloqueio ---------- */
+function novo(espId, min) {
+  const opEsp = B.espacos.map(e => `<option value="${e.id}" ${e.id === espId ? 'selected' : ''}>${esc(e.nome)}</option>`).join('');
+  dialogo(`<h3>Nova marcação · ${esc(dataCurta(dia))}</h3>
+    <form class="stack" id="f-novo">
+      <div class="seg" role="radiogroup" aria-label="Tipo"><label><input type="radio" name="tipo" value="reserva" checked> Reserva de hóspede</label><label><input type="radio" name="tipo" value="bloqueio"> Bloqueio</label></div>
+      <div class="fgrid">
+        <label class="f" for="n-esp">Espaço<select id="n-esp" name="esp">${opEsp}</select></label>
+        <label class="f" for="n-ini">Início<select id="n-ini" name="ini"></select></label>
+        <label class="f" for="n-dur">Duração<select id="n-dur" name="dur"></select></label>
+      </div>
+      <div class="fgrid so-res">
+        <label class="f" for="n-quarto">Quarto<input id="n-quarto" name="quarto"></label>
+        <label class="f" for="n-apelido">Apelido<input id="n-apelido" name="apelido"></label>
+        <label class="f" for="n-nome">Nome<input id="n-nome" name="nome"></label>
+        <label class="f" for="n-tel">Telemóvel<input id="n-tel" name="tel" type="tel"></label>
+        <label class="f wide" for="n-email">Email<input id="n-email" name="email" type="email"></label>
+        <label class="chk wide" for="n-mat"><input type="checkbox" id="n-mat" name="mat"><span>Precisa de material</span></label>
+      </div>
+      <label class="f so-blq" for="n-motivo" hidden>Motivo<input id="n-motivo" name="motivo" placeholder="Ex.: manutenção, aula, evento"></label>
+      <label class="f" for="n-notas">Notas<input id="n-notas" name="notas"></label>
+      <div class="row end"><button type="button" class="btn ghost" data-fechar>Cancelar</button><button class="btn">Guardar</button></div>
+    </form>`, (dlg, fechar) => {
+    const f = dlg.querySelector('form'), el = f.elements;
+    const blq = () => el.tipo.value === 'bloqueio';
+    const opcoes = () => {
+      const e = B.espacos.find(x => x.id === el.esp.value);
+      const ocup = itens.filter(r => r.espaco_id === e.id).map(r => [new Date(r.inicio).getTime(), new Date(r.fim).getTime()]);
+      const livreEm = (a, b) => !ocup.some(([x, y]) => a < y && b > x);
+      const iniAtual = el.ini.value !== '' ? +el.ini.value : min;
+      let h = '';
+      for (let m = e.abreMin; m < e.fechaMin; m += e.passo_min) {
+        const a = lisboa(dia, m).getTime();
+        const ok = livreEm(a, a + e.passo_min * 60000);
+        h += `<option value="${m}" ${m === iniAtual ? 'selected' : ''} ${ok ? '' : 'disabled'}>${min2hm(m)}${ok ? '' : ' (ocupado)'}</option>`;
+      }
+      el.ini.innerHTML = h;
+      if (el.ini.selectedOptions[0]?.disabled) { const o = [...el.ini.options].find(o => !o.disabled); if (o) el.ini.value = o.value; }
+      const m0 = +el.ini.value, a0 = lisboa(dia, m0).getTime();
+      const maxD = blq() ? e.fechaMin - m0 : Math.min(e.max_duracao_min, e.fechaMin - m0);
+      const durAtual = +el.dur.value || 60;
+      let d = '';
+      for (let x = e.passo_min; x <= maxD; x += e.passo_min) {
+        if (!livreEm(a0, a0 + x * 60000)) break;
+        d += `<option value="${x}" ${x === durAtual ? 'selected' : ''}>${x >= 60 ? `${Math.floor(x / 60)}h${x % 60 ? String(x % 60).padStart(2, '0') : ''}` : x + ' min'} (até ${min2hm(m0 + x)})</option>`;
+      }
+      el.dur.innerHTML = d || '<option value="">—</option>';
+    };
+    const tipo = () => { dlg.querySelector('.so-res').hidden = blq(); dlg.querySelector('.so-blq').hidden = !blq(); el.quarto.required = el.apelido.required = !blq(); opcoes(); };
+    f.querySelectorAll('[name=tipo]').forEach(r => r.onchange = tipo);
+    el.esp.onchange = opcoes; el.ini.onchange = opcoes;
+    tipo();
+    f.onsubmit = async ev => {
+      ev.preventDefault();
+      if (!el.dur.value) { toast('Não há duração possível nesse horário.', 'erro'); return; }
+      const inicio = lisboa(dia, +el.ini.value), fimD = new Date(inicio.getTime() + +el.dur.value * 60000);
+      const reg = { espaco_id: el.esp.value, tipo: el.tipo.value, inicio: inicio.toISOString(), fim: fimD.toISOString(), origem: 'rececao', notas: el.notas.value.trim() || null };
+      if (blq()) reg.motivo = el.motivo.value.trim() || null;
+      else Object.assign(reg, { quarto: el.quarto.value.trim().toUpperCase(), apelido: el.apelido.value.trim(), nome: el.nome.value.trim() || null, telefone: el.tel.value.trim() || null, email: el.email.value.trim().toLowerCase() || null, precisa_material: el.mat.checked });
+      const { error } = await sb.from('reservas').insert(reg);
+      if (error) { toast(erroTexto(error), 'erro'); return; }
+      fechar(); toast(blq() ? 'Bloqueio criado' : 'Reserva criada'); recarregar();
+    };
+  });
+}
+
+/* ---------- detalhe ---------- */
+const linkReserva = r => `${location.origin}${location.pathname}#/r/${r.token}`;
+function msgHospede(r, u) {
+  const base = `Verdelago Sports Center: ${nomeEsp(r.espaco_id)}, ${dataCurta(diaDe(r.inicio))} ${hora(r.inicio)}–${hora(r.fim)}.`;
+  return (u ? `${base} Material no cacifo ${u.cacifo_id}, código ${u.codigo}.` : base) + ` ${linkReserva(r)}`;
+}
+const waLink = (tel, txt) => `https://wa.me/${String(tel || '').replace(/\D/g, '')}?text=${encodeURIComponent(txt)}`;
+function cacifosLivres() { const ocup = new Set(usosAtivos.map(u => u.cacifo_id)); return cacifos.filter(c => c.ativo && !ocup.has(c.id)); }
+
+function detalhe(r) {
+  if (!r) return;
+  const u = usoAtivo(r), res = r.tipo === 'reserva';
+  const livres = cacifosLivres();
+  dialogo(`<div class="row between"><h3>${esc(nomeEsp(r.espaco_id))} · ${hora(r.inicio)}–${hora(r.fim)}</h3><button class="x" data-fechar aria-label="Fechar">×</button></div>
+    <dl class="dl">${res ? `<dt>Quarto</dt><dd>${esc(r.quarto)} · ${esc(r.apelido)}${r.nome ? ` (${esc(r.nome)})` : ''}</dd>
+      ${r.email ? `<dt>Email</dt><dd>${esc(r.email)}</dd>` : ''}${r.telefone ? `<dt>Telemóvel</dt><dd>${esc(r.telefone)}</dd>` : ''}
+      ${r.jogadores ? `<dt>Jogadores</dt><dd>${r.jogadores}</dd>` : ''}<dt>Origem</dt><dd>${r.origem === 'online' ? 'Online' : 'Receção'}</dd>`
+      : `<dt>Tipo</dt><dd>${r.tipo === 'torneio' ? 'Torneio' : 'Bloqueio'}</dd>${r.motivo ? `<dt>Motivo</dt><dd>${esc(r.motivo)}</dd>` : ''}`}
+      ${r.notas ? `<dt>Notas</dt><dd>${esc(r.notas)}</dd>` : ''}</dl>
+    ${res ? `<section class="stack cx">
+      <h3>Cacifo</h3>
+      ${u ? `<div class="cacifo-big small"><div><span>Cacifo</span><b>${u.cacifo_id}</b></div><div><span>Código</span><b>${esc(u.codigo)}</b></div>${u.material ? `<p>${esc(u.material)}</p>` : ''}</div>
+        <div class="row"><button class="btn small" data-acao="devolvido">Material devolvido</button><button class="btn ghost small" data-acao="retirar">Retirar do cacifo</button></div>`
+      : `<form class="stack" id="f-cacifo">
+          ${r.precisa_material ? '<p class="small">🎒 O hóspede pediu material.</p>' : ''}
+          <div class="fgrid">
+            <label class="f" for="c-num">Cacifo<select id="c-num" name="num" required>${livres.map(c => `<option value="${c.id}">${c.id}${c.tamanho === 'grande' ? ' (grande)' : ''}</option>`).join('') || '<option value="">Nenhum livre</option>'}</select></label>
+            <label class="f" for="c-cod">Código definido<div class="row nowrap"><input id="c-cod" name="cod" required pattern="[0-9]{3,8}" inputmode="numeric" maxlength="8" style="width:100%"><button type="button" class="btn ghost small" id="c-gerar" title="Sugerir código">🎲</button></div></label>
+            <label class="f wide" for="c-mat">Material deixado<input id="c-mat" name="mat" placeholder="Ex.: 4 raquetes + 1 tubo de bolas"></label>
+          </div>
+          <div class="row end"><button class="btn small" ${livres.length ? '' : 'disabled'}>Guardar cacifo</button></div>
+        </form>`}
+      <div class="row">
+        <button class="btn ghost small" data-acao="copiar">Copiar mensagem para o hóspede</button>
+        ${r.telefone ? `<a class="btn ghost small" target="_blank" rel="noopener" href="${esc(waLink(r.telefone, msgHospede(r, u)))}">Enviar por WhatsApp</a>` : ''}
+        ${r.email ? `<a class="btn ghost small" href="mailto:${esc(r.email)}?subject=${encodeURIComponent('Reserva Verdelago Sports Center')}&body=${encodeURIComponent(msgHospede(r, u))}">Enviar por email</a>` : ''}
+      </div></section>` : ''}
+    <div class="row between"><button class="btn ghost danger small" data-acao="cancelar">${res ? 'Cancelar reserva' : 'Remover bloqueio'}</button><button class="btn ghost small" data-fechar>Fechar</button></div>`,
+    (dlg, fechar) => {
+      const acao = async (k) => {
+        if (k === 'copiar') { try { await navigator.clipboard.writeText(msgHospede(r, u)); toast('Mensagem copiada'); } catch { prompt('', msgHospede(r, u)); } return; }
+        if (k === 'cancelar') {
+          if (!await confirmar(res ? `Cancelar a reserva do quarto ${r.quarto}?` : 'Remover este bloqueio?', res ? 'Cancelar reserva' : 'Remover', true)) return;
+          const { error } = await sb.from('reservas').update({ estado: 'cancelada', cancelado_em: new Date().toISOString() }).eq('id', r.id);
+          if (!error && u) await sb.from('cacifo_usos').update({ estado: 'cancelado' }).eq('id', u.id);
+          if (error) { toast(erroTexto(error), 'erro'); return; }
+          toast(res ? 'Reserva cancelada' : 'Bloqueio removido'); recarregar(); return;
+        }
+        if (k === 'devolvido' || k === 'retirar') {
+          const upd = k === 'devolvido' ? { estado: 'devolvido', devolvido_em: new Date().toISOString() } : { estado: 'cancelado' };
+          const { error } = await sb.from('cacifo_usos').update(upd).eq('id', u.id);
+          if (error) { toast(erroTexto(error), 'erro'); return; }
+          fechar(); toast(k === 'devolvido' ? `Cacifo ${u.cacifo_id} livre. Lembre-se de mudar o código.` : 'Cacifo libertado'); recarregar();
+        }
+      };
+      dlg.querySelectorAll('[data-acao]').forEach(b => b.onclick = () => acao(b.dataset.acao));
+      const fc = dlg.querySelector('#f-cacifo');
+      if (fc) {
+        dlg.querySelector('#c-gerar').onclick = () => { fc.elements.cod.value = String(Math.floor(Math.random() * 10000)).padStart(4, '0'); };
+        fc.onsubmit = async ev => {
+          ev.preventDefault();
+          const el = fc.elements;
+          const { data: { user } } = await sb.auth.getUser();
+          const { error } = await sb.from('cacifo_usos').insert({ cacifo_id: +el.num.value, reserva_id: r.id, codigo: el.cod.value.trim(), material: el.mat.value.trim() || null, preparado_por: user?.id || null });
+          if (error) { toast(/cacifo_ocupado/.test(error.message) ? 'Esse cacifo já está ocupado.' : erroTexto(error), 'erro'); return; }
+          toast(`Cacifo ${el.num.value} associado. O hóspede já vê o código na reserva.`);
+          await recarregar();
+          detalhe(itens.find(x => x.id === r.id) || porPreparar.find(x => x.id === r.id) || r);
+        };
+      }
+    });
+}
+
+/* ---------- cacifos e material ---------- */
+function vCacifos() {
+  const usoDe = id => usosAtivos.find(u => u.cacifo_id === id);
+  return `<section class="stack"><h2>Material por preparar</h2>
+    ${porPreparar.length ? `<ul class="lista card">${porPreparar.map(r => `<li><span><b>${esc(dataCurta(diaDe(r.inicio)))} ${hora(r.inicio)}</b> · ${esc(nomeEsp(r.espaco_id))} · Q${esc(r.quarto)} ${esc(r.apelido)}${r.notas ? ` <span class="muted small">· ${esc(r.notas)}</span>` : ''}</span><button class="btn small" data-prep="${r.id}">Preparar cacifo</button></li>`).join('')}</ul>`
+      : '<p class="muted">Nada por preparar hoje e amanhã.</p>'}</section>
+    <section class="stack"><h2>Cacifos</h2><div class="cacifos">${cacifos.map(c => {
+      const u = usoDe(c.id), r = u?.reservas;
+      return `<div class="cacifo ${u ? 'ocup' : ''} ${c.ativo ? '' : 'inativo'}"><div class="row between"><b class="cn">${c.id}</b><span class="chip ${u ? 'warn' : 'ok'}">${!c.ativo ? 'Inativo' : u ? 'Ocupado' : 'Livre'}</span></div>
+        <span class="small muted">${c.tamanho === 'grande' ? 'Grande' : 'Médio'}</span>
+        ${u && r ? `<div class="small">Q${esc(r.quarto)} ${esc(r.apelido)} · ${esc(nomeEsp(r.espaco_id))}<br>${esc(dataCurta(diaDe(r.inicio)))} ${hora(r.inicio)} · código <b>${esc(u.codigo)}</b>${u.material ? `<br>${esc(u.material)}` : ''}</div>
+          <button class="btn small" data-dev="${u.id}">Devolvido</button>` : ''}</div>`;
+    }).join('')}</div>
+    <p class="small muted">Depois de cada devolução, mude o código da fechadura antes de voltar a usar o cacifo.</p></section>`;
+}
+function ligarCacifos() {
+  $$('[data-prep]').forEach(b => b.onclick = () => detalhe(porPreparar.find(r => r.id === b.dataset.prep)));
+  $$('[data-dev]').forEach(b => b.onclick = async () => {
+    const { error } = await sb.from('cacifo_usos').update({ estado: 'devolvido', devolvido_em: new Date().toISOString() }).eq('id', b.dataset.dev);
+    if (error) { toast(erroTexto(error), 'erro'); return; }
+    toast('Cacifo livre. Lembre-se de mudar o código.'); recarregar();
+  });
+}
