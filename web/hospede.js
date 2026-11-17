@@ -6,7 +6,7 @@ const TXT = {
     titulo: 'Reservar espaço desportivo', sub: 'Exclusivo para hóspedes do Verdelago',
     mod: 'Modalidade', dia: 'Dia', dur: 'Duração', hora: 'Hora de início', campo: 'Campo',
     hojeL: 'Hoje', amanha: 'Amanhã', livres: n => n === 1 ? '1 livre' : `${n} livres`, semHoras: 'Não há horários livres neste dia para esta duração.',
-    dados: 'Os seus dados', quarto: 'N.º do quarto', apelido: 'Apelido (como no check-in)', nome: 'Nome', email: 'Email', tel: 'Telemóvel (opcional)',
+    dados: 'Os seus dados', quarto: 'Quarto (ex.: A123, T045, V12)', apelido: 'Apelido (como no check-in)', nome: 'Nome', email: 'Email', tel: 'Telemóvel (opcional)',
     jog: 'N.º de jogadores', material: 'Preciso de material (raquetes, bolas…)', materialNota: 'Se a receção estiver fechada, deixamos o material num cacifo e o código aparece na sua reserva.',
     notas: 'Observações (opcional)', reservar: 'Confirmar reserva', aReservar: 'A reservar…',
     resumo: (e, d, h1, h2) => `${e} · ${d} · ${h1}–${h2}`,
@@ -22,7 +22,7 @@ const TXT = {
     titulo: 'Book a sports court', sub: 'For Verdelago guests only',
     mod: 'Sport', dia: 'Day', dur: 'Duration', hora: 'Start time', campo: 'Court',
     hojeL: 'Today', amanha: 'Tomorrow', livres: n => `${n} free`, semHoras: 'No free times on this day for this duration.',
-    dados: 'Your details', quarto: 'Room number', apelido: 'Surname (as at check-in)', nome: 'Name', email: 'Email', tel: 'Mobile (optional)',
+    dados: 'Your details', quarto: 'Room (e.g. A123, T045, V12)', apelido: 'Surname (as at check-in)', nome: 'Name', email: 'Email', tel: 'Mobile (optional)',
     jog: 'Number of players', material: 'I need equipment (rackets, balls…)', materialNota: 'If reception is closed, we leave the equipment in a locker and the code shows on your booking.',
     notas: 'Notes (optional)', reservar: 'Confirm booking', aReservar: 'Booking…',
     resumo: (e, d, h1, h2) => `${e} · ${d} · ${h1}–${h2}`,
@@ -48,7 +48,13 @@ const ERROS_EN = {
 
 let lang = (() => { try { return localStorage.getItem('vs-lang') || (navigator.language.startsWith('pt') ? 'pt' : 'en'); } catch { return 'pt'; } })();
 const t = k => TXT[lang][k];
-const erroL = e => { const m = erroTexto(e); return lang === 'en' ? (ERROS_EN[m] || m) : m; };
+const erroL = e => {
+  const m = erroTexto(e);
+  if (lang !== 'en') return m;
+  const q = m.match(/^Não encontrámos o quarto (\S+)/);
+  if (q) return `We could not find room ${q[1]} staying on that day. Please check the number or contact reception.`;
+  return ERROS_EN[m] || m;
+};
 
 /* tokens das reservas feitas neste telemóvel (só para conveniência) */
 const lerMinhas = () => { try { return JSON.parse(localStorage.getItem('vs-minhas') || '[]'); } catch { return []; } };
@@ -129,7 +135,7 @@ function desenhar(app) {
       <div class="resumo">${esc(t('resumo')(espSel.nome, dataLonga(S.dia, lang), min2hm(S.hora), min2hm(S.hora + S.dur)))}</div>
       <h2>${esc(t('dados'))}</h2>
       <div class="fgrid">
-        <label class="f" for="r-quarto">${esc(t('quarto'))}<input id="r-quarto" name="quarto" required autocomplete="off" inputmode="numeric"></label>
+        <label class="f" for="r-quarto">${esc(t('quarto'))}<input id="r-quarto" name="quarto" required autocomplete="off" autocapitalize="characters" placeholder="A123"></label>
         <label class="f" for="r-apelido">${esc(t('apelido'))}<input id="r-apelido" name="apelido" required autocomplete="family-name"></label>
         <label class="f" for="r-nome">${esc(t('nome'))}<input id="r-nome" name="nome" autocomplete="name"></label>
         <label class="f" for="r-email">${esc(t('email'))}<input id="r-email" name="email" type="email" required autocomplete="email"></label>

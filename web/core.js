@@ -43,6 +43,15 @@ export function dataCurta(dia, lang = 'pt') {
 export const diaDe = d => new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(new Date(d));
 
 /* ---------- dados ---------- */
+/** Quarto no formato do Opera/Beach OPS: A123, T045, V12 (null se não reconhecido) */
+export function normQuarto(v) {
+  const s = String(v || '').toUpperCase().replace(/[\s\-_.]/g, ''), m = s.match(/^([ATV])0*(\d{1,3})$/);
+  if (!m) return null;
+  const n = +m[2];
+  if (m[1] === 'V') return n >= 1 && n <= 99 ? 'V' + n : null;
+  return n >= 1 && n <= 999 ? m[1] + String(n).padStart(3, '0') : null;
+}
+
 export const MODALIDADES = {
   padel: { pt: 'Pádel', en: 'Padel', icon: '🎾' },
   tenis: { pt: 'Ténis', en: 'Tennis', icon: '🎾' },
