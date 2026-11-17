@@ -1,7 +1,7 @@
 // Painel da receção (#/rececao): login, grelha do dia, reservas/bloqueios, cacifos.
-import { sb, $, $$, esc, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, carregarBase, erroTexto, toast, dialogo, confirmar, grelha, LOGO } from './core.js';
+import { sb, $, $$, esc, normQuarto, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, carregarBase, erroTexto, toast, dialogo, confirmar, grelha, LOGO } from './core.js';
 
-let B = null, dia = hoje(), aba = 'grelha', itens = [], cacifos = [], usosAtivos = [], porPreparar = [], app = null, staffNome = '';
+let ultImport = null, B = null, dia = hoje(), aba = 'grelha', itens = [], cacifos = [], usosAtivos = [], porPreparar = [], app = null, staffNome = '';
 
 export async function paginaRececao(el) {
   app = el;
@@ -39,12 +39,14 @@ async function sair() { await sb.auth.signOut(); login(); }
 async function recarregar() {
   const ini = lisboa(dia, 0).toISOString(), fim = lisboa(addDias(dia, 1), 0).toISOString();
   const agora = new Date().toISOString(), ate = lisboa(addDias(hoje(), 2), 0).toISOString();
-  const [r, c, u, p] = await Promise.all([
+  const [r, c, u, p, imp] = await Promise.all([
     sb.from('reservas').select('*, cacifo_usos(*)').eq('estado', 'confirmada').lt('inicio', fim).gt('fim', ini).order('inicio'),
     sb.from('cacifos').select('*').order('id'),
     sb.from('cacifo_usos').select('*, reservas(id, espaco_id, inicio, fim, quarto, apelido, nome, telefone, token)').eq('estado', 'preparado').order('cacifo_id'),
     sb.from('reservas').select('*, cacifo_usos(id, estado)').eq('estado', 'confirmada').eq('precisa_material', true).gt('fim', agora).lt('inicio', ate).order('inicio'),
+    sb.from('importacoes').select('em, quartos, por').order('em', { ascending: false }).limit(1).maybeSingle(),
   ]);
+  ultImport = imp.data || null;
   const err = r.error || c.error || u.error || p.error;
   if (err) { toast(erroTexto(err), 'erro'); return; }
   itens = r.data; cacifos = c.data; usosAtivos = u.data;
@@ -83,7 +85,7 @@ function vGrelha() {
       <input type="date" id="g-dia" value="${dia}" aria-label="Dia"><h2 class="cap">${esc(dataLonga(dia))}</h2></div>
       <div class="row"><span class="muted small">${n} reserva${n === 1 ? '' : 's'}</span><button class="btn small" id="b-novo">+ Reserva / bloqueio</button><button class="btn ghost small" id="b-rec">Atualizar</button></div>
     </div>
-    <p class="small muted" style="margin:0">Toque num espaço livre para reservar ou bloquear; toque numa reserva para ver detalhes, cancelar ou preparar cacifo.</p>
+    <p class="small muted" style="margin:0">${ultImport ? `Lista de hóspedes (Beach OPS): ${ultImport.quartos} estadias, importada ${esc(dataCurta(diaDe(ultImport.em)))} às ${hora(ultImport.em)}${ultImport.por ? ' por ' + esc(ultImport.por) : ''}. ` : 'Lista de hóspedes ainda não importada no Beach OPS: os quartos não são validados. '}Toque num espaço livre para reservar ou bloquear; toque numa reserva para ver detalhes, cancelar ou preparar cacifo.</p>
     ${grelha({ espacos: B.espacos, dia, itens: itens.map(r => ({ ...r, label: rotulo(r), extra: esc(extra(r)) })), clicavel: true })}`;
 }
 function ligarGrelha() {
@@ -108,7 +110,7 @@ function novo(espId, min) {
         <label class="f" for="n-dur">Duração<select id="n-dur" name="dur"></select></label>
       </div>
       <div class="fgrid so-res">
-        <label class="f" for="n-quarto">Quarto<input id="n-quarto" name="quarto"></label>
+        <label class="f" for="n-quarto">Quarto<input id="n-quarto" name="quarto" placeholder="A123" autocapitalize="characters"></label>
         <label class="f" for="n-apelido">Apelido<input id="n-apelido" name="apelido"></label>
         <label class="f" for="n-nome">Nome<input id="n-nome" name="nome"></label>
         <label class="f" for="n-tel">Telemóvel<input id="n-tel" name="tel" type="tel"></label>
@@ -154,7 +156,7 @@ function novo(espId, min) {
       const inicio = lisboa(dia, +el.ini.value), fimD = new Date(inicio.getTime() + +el.dur.value * 60000);
       const reg = { espaco_id: el.esp.value, tipo: el.tipo.value, inicio: inicio.toISOString(), fim: fimD.toISOString(), origem: 'rececao', notas: el.notas.value.trim() || null };
       if (blq()) reg.motivo = el.motivo.value.trim() || null;
-      else Object.assign(reg, { quarto: el.quarto.value.trim().toUpperCase(), apelido: el.apelido.value.trim(), nome: el.nome.value.trim() || null, telefone: el.tel.value.trim() || null, email: el.email.value.trim().toLowerCase() || null, precisa_material: el.mat.checked });
+      else Object.assign(reg, { quarto: normQuarto(el.quarto.value) || el.quarto.value.trim().toUpperCase(), apelido: el.apelido.value.trim(), nome: el.nome.value.trim() || null, telefone: el.tel.value.trim() || null, email: el.email.value.trim().toLowerCase() || null, precisa_material: el.mat.checked });
       const { error } = await sb.from('reservas').insert(reg);
       if (error) { toast(erroTexto(error), 'erro'); return; }
       fechar(); toast(blq() ? 'Bloqueio criado' : 'Reserva criada'); recarregar();

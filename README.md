@@ -29,7 +29,7 @@ Fechaduras de combinação reprogramável. A receção põe o material, define u
 
 ## Base de dados
 
-`supabase/migrations/`: aplicadas por ordem (0001 esquema inicial, 0002 slots de 30 min). Já estão aplicadas no projeto.
+`supabase/migrations/`: aplicadas por ordem (0001 esquema inicial, 0002 slots de 30 min, 0003 estadias e validação do quarto). Já estão aplicadas no projeto.
 
 Os hóspedes não leem as tabelas diretamente (RLS). Só usam estas funções:
 
@@ -46,6 +46,14 @@ Os hóspedes não leem as tabelas diretamente (RLS). Só usam estas funções:
    insert into public.staff (user_id, nome)
    select id, 'Nome' from auth.users where email = 'pessoa@verdelago.com';
    ```
+
+## Lista de hóspedes (Beach OPS)
+
+Quando a equipa importa o **In House** ou o **Arrivals** do Opera no Beach OPS (`verdelago-beach-app`), a app chama a função `supabase/functions/sincronizar-quartos` com o login Firebase de quem importou. A função lê `inhouse/<dia>` diretamente do Firestore com esse login (se não houver acesso, nada muda) e substitui a tabela `estadias` (quarto, chegada, partida, n.º de pessoas; **sem nomes**).
+
+Com `config.validar_quarto = true`, uma reserva online só é aceite se o quarto tiver estadia nesse dia. A validação só se aplica se houve importação nas últimas 48 h, para não bloquear reservas se a lista não for importada. Quartos no formato do Opera: `A123`, `T045`, `V12` (o hóspede pode escrever `a 12`).
+
+Publicar a função: `POST /v1/projects/<ref>/functions/deploy?slug=sincronizar-quartos` (Management API) com `verify_jwt: false`.
 
 ## App web (`web/`)
 
@@ -66,7 +74,7 @@ Testar localmente: `cd web && python3 -m http.server 8765` e abrir `http://local
 
 - [x] App web: reservas (hóspedes), painel da receção, cacifos
 - [x] Publicar o site
-- [ ] Validar quarto + apelido com a lista de hóspedes (GIH/Arrivals)
+- [x] Validar o quarto com a lista de hóspedes do Opera (via Beach OPS)
 - [ ] Emails (confirmação e código do cacifo)
 - [ ] Torneios de pádel (a partir da app existente) a bloquear campos automaticamente
 - [ ] Ecrã TV com ocupação e torneios
