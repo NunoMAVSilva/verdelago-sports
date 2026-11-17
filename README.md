@@ -40,10 +40,11 @@ Os hóspedes não leem as tabelas diretamente (RLS). Só usam estas funções:
 
 ### Criar uma conta da receção
 
-1. Supabase › **Authentication › Users › Add user** (email + password).
-2. Copiar o *User UID* e, no SQL Editor:
+1. Supabase › **Authentication › Users › Add user** (email + password, *Auto Confirm User*).
+2. Dar acesso ao painel (pedir ao Claude ou, no SQL Editor):
    ```sql
-   insert into public.staff (user_id, nome) values ('<UID>', 'Receção');
+   insert into public.staff (user_id, nome)
+   select id, 'Nome' from auth.users where email = 'pessoa@verdelago.com';
    ```
 
 ## App web (`web/`)
@@ -57,12 +58,14 @@ Site estático (HTML + JS, sem build). Uma só página com rotas:
 | `#/rececao` | Painel da receção (login): grelha do dia, reservas e bloqueios, cacifos e material por preparar, mensagem para o hóspede por WhatsApp/email |
 | `#/tv` | Ecrã TV: ocupação do dia, atualiza a cada minuto |
 
+Publicado em **https://nunomavsilva.github.io/verdelago-sports/** (GitHub Pages; cada push para `main` que mexa em `web/` publica automaticamente).
+
 Testar localmente: `cd web && python3 -m http.server 8765` e abrir `http://localhost:8765`.
 
 ## Próximos passos
 
 - [x] App web: reservas (hóspedes), painel da receção, cacifos
-- [ ] Publicar o site
+- [x] Publicar o site
 - [ ] Validar quarto + apelido com a lista de hóspedes (GIH/Arrivals)
 - [ ] Emails (confirmação e código do cacifo)
 - [ ] Torneios de pádel (a partir da app existente) a bloquear campos automaticamente
