@@ -249,10 +249,10 @@ function diasTorneio(t) {
 function vTorneios() {
   const passou = t => t.data && (t.data_fim || t.data) < hoje();
   const lista = ts => ts.length ? `<ul class="lista card">${ts.map(t => `<li><span><b class="cap">${esc(t.nome)}</b><br><span class="small"><span class="cap">${esc(diasTorneio(t))}</span> · ${hm(t.hora_inicio)}–${hm(t.hora_fim)} · ${t.espacos.length ? esc(t.espacos.map(nomeEsp).join(', ')) : '<span class="chip warn">sem campos</span>'}${t.publico ? '' : ' · <span class="chip">privado</span>'}</span></span>
-      <span class="row">${t.data ? `<button class="btn ghost small" data-ver="${t.id}">Ver na grelha</button>` : ''}<button class="btn small" data-tor="${t.id}">Editar</button></span></li>`).join('')}</ul>` : '<p class="muted">Nenhum.</p>';
+      <span class="row">${t.data ? `<button class="btn ghost small" data-ver="${t.id}">Ver na grelha</button>` : ''}<button class="btn ghost small" data-tor="${t.id}">Dias e campos</button><a class="btn small" href="#/torneio/${t.id}">Abrir torneio</a></span></li>`).join('')}</ul>` : '<p class="muted">Nenhum.</p>';
   const prox = torneios.filter(t => !passou(t)), ant = torneios.filter(passou).reverse();
   return `<section class="stack"><div class="row between"><h2>Próximos torneios</h2><button class="btn small" id="b-tor">+ Torneio</button></div>
-    <p class="small muted" style="margin:0">Os campos escolhidos ficam bloqueados automaticamente nos dias e horas do torneio, e os hóspedes deixam de os poder reservar. Se já houver reservas nesse horário, o torneio não é gravado e aparece a lista para as resolver.</p>
+    <p class="small muted" style="margin:0">Em "Abrir torneio": inscrições, grupos, jogos, resultados, eliminatórias e ecrã TV (<a href="#/tv/torneio" target="_blank" rel="noopener">#/tv/torneio</a> mostra o torneio público do dia). Os campos escolhidos ficam bloqueados automaticamente nos dias e horas do torneio, e os hóspedes deixam de os poder reservar. Se já houver reservas nesse horário, o torneio não é gravado e aparece a lista para as resolver.</p>
     ${lista(prox)}</section>
     ${ant.length ? `<section class="stack"><h2>Últimas duas semanas</h2>${lista(ant)}</section>` : ''}`;
 }
@@ -261,12 +261,13 @@ function ligarTorneios() {
   $$('[data-tor]').forEach(b => b.onclick = () => editarTorneio(torneios.find(t => t.id === b.dataset.tor)));
   $$('[data-ver]').forEach(b => b.onclick = () => { const t = torneios.find(x => x.id === b.dataset.ver); dia = t.data; aba = 'grelha'; recarregar(); });
 }
-function editarTorneio(t) {
+// Também usado na página do torneio (torneio.js), com a base e o "depois" de lá.
+export function editarTorneio(t, Bx = B, depois = recarregar) {
   const novoT = !t;
-  t = t || { nome: '', data: dia >= hoje() ? dia : hoje(), data_fim: null, hora_inicio: '09:00', hora_fim: '13:00', espacos: B.espacos.filter(e => e.modalidade === 'padel').map(e => e.id), publico: true, notas: '' };
-  const ini = Math.min(...B.espacos.map(e => e.abreMin)), fim = Math.max(...B.espacos.map(e => e.fechaMin));
+  t = t || { nome: '', data: dia >= hoje() ? dia : hoje(), data_fim: null, hora_inicio: '09:00', hora_fim: '13:00', espacos: Bx.espacos.filter(e => e.modalidade === 'padel').map(e => e.id), publico: true, notas: '' };
+  const ini = Math.min(...Bx.espacos.map(e => e.abreMin)), fim = Math.max(...Bx.espacos.map(e => e.fechaMin));
   const opH = (sel, de, ate) => { let h = ''; for (let m = de; m <= ate; m += 30) h += `<option value="${min2hm(m)}" ${min2hm(m) === hm(sel) ? 'selected' : ''}>${min2hm(m)}</option>`; return h; };
-  const padel = B.espacos.filter(e => e.modalidade === 'padel'), outros = B.espacos.filter(e => e.modalidade !== 'padel');
+  const padel = Bx.espacos.filter(e => e.modalidade === 'padel'), outros = Bx.espacos.filter(e => e.modalidade !== 'padel');
   const chk = e => `<label><input type="checkbox" name="esp" value="${e.id}" ${t.espacos.includes(e.id) ? 'checked' : ''}> ${esc(e.nome)}</label>`;
   dialogo(`<div class="row between"><h3>${novoT ? 'Novo torneio' : 'Editar torneio'}</h3><button class="x" data-fechar aria-label="Fechar">×</button></div>
     <form class="stack" id="f-tor">
@@ -289,7 +290,7 @@ function editarTorneio(t) {
     </form>`, (dlg, fechar) => {
     const f = dlg.querySelector('form'), el = f.elements, erro = dlg.querySelector('.erro-tor');
     dlg.querySelectorAll('[data-todos]').forEach(b => b.onclick = () => {
-      dlg.querySelectorAll('[name=esp]').forEach(c => { c.checked = !!b.dataset.todos && B.espacos.find(e => e.id === c.value)?.modalidade === b.dataset.todos; });
+      dlg.querySelectorAll('[name=esp]').forEach(c => { c.checked = !!b.dataset.todos && Bx.espacos.find(e => e.id === c.value)?.modalidade === b.dataset.todos; });
     });
     f.onsubmit = async ev => {
       ev.preventDefault(); erro.hidden = true;
@@ -301,17 +302,19 @@ function editarTorneio(t) {
       const msg = !reg.nome ? 'Indique o nome.' : reg.hora_fim <= reg.hora_inicio ? 'A hora de fim tem de ser depois da de início.'
         : reg.data_fim && reg.data_fim < reg.data ? 'O último dia tem de ser depois do primeiro.' : !reg.espacos.length ? 'Escolha pelo menos um campo.' : '';
       if (msg) { erro.textContent = msg; erro.hidden = false; return; }
-      const q = novoT ? sb.from('torneios').insert(reg) : sb.from('torneios').update(reg).eq('id', t.id);
-      const { error } = await q;
+      const q = novoT ? sb.from('torneios').insert(reg).select('id').single() : sb.from('torneios').update(reg).eq('id', t.id);
+      const { data: novo, error } = await q;
       if (error) { erro.textContent = /torneios_datas_ck/.test(error.message) ? 'Um torneio pode ter no máximo 15 dias.' : erroTexto(error); erro.hidden = false; return; }
-      fechar(); toast(`Torneio guardado: ${reg.espacos.length} campo${reg.espacos.length === 1 ? '' : 's'} bloqueado${reg.espacos.length === 1 ? '' : 's'}.`); recarregar();
+      fechar(); toast(`Torneio guardado: ${reg.espacos.length} campo${reg.espacos.length === 1 ? '' : 's'} bloqueado${reg.espacos.length === 1 ? '' : 's'}.`);
+      if (novoT && novo) location.hash = `#/torneio/${novo.id}`; else depois();
     };
     const ap = dlg.querySelector('#t-apagar');
     if (ap) ap.onclick = async () => {
       if (!await confirmar(`Apagar o torneio "${t.nome}"? Os campos ficam livres para reserva.`, 'Apagar', true)) return;
       const { error } = await sb.from('torneios').delete().eq('id', t.id);
       if (error) { toast(erroTexto(error), 'erro'); return; }
-      toast('Torneio apagado. Campos livres.'); recarregar();
+      toast('Torneio apagado. Campos livres.');
+      if (location.hash.startsWith('#/torneio/')) location.hash = '#/rececao'; else depois();
     };
   });
 }
