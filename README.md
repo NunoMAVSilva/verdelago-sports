@@ -31,7 +31,7 @@ Fechaduras de combinação reprogramável. A receção põe o material, define u
 
 ## Base de dados
 
-`supabase/migrations/`: aplicadas por ordem (0001 esquema inicial, 0002 slots de 30 min, 0003 estadias e validação do quarto, 0004 torneios a bloquear campos, 0005 app dos torneios, 0006 Realtime, 0007 emails, 0008 material não devolvido). Já estão aplicadas no projeto.
+`supabase/migrations/`: aplicadas por ordem (0001 esquema inicial, 0002 slots de 30 min, 0003 estadias e validação do quarto, 0004 torneios a bloquear campos, 0005 app dos torneios, 0006 Realtime, 0007 emails, 0008 material não devolvido, 0009 material desportivo). Já estão aplicadas no projeto.
 
 Os hóspedes não leem as tabelas diretamente (RLS). Só usam estas funções:
 
@@ -56,6 +56,16 @@ No painel, aba **Torneios**: nome, dia (ou vários dias seguidos), horas e campo
 **Gerir o torneio** (`#/torneio/<id>`, botão "Abrir torneio"; antes era um artefacto à parte): inscrições de duplas e individuais (com nível 1–6 e formação de duplas), grupos com cabeças de série ou sorteio, calendário pelos campos do torneio, resultados a tempo corrido com desempate, apuramento e quadro de eliminatórias, cronómetro. Tudo fica em `torneios.dados`; grava sozinho e, se outro aparelho alterou o torneio entretanto, recarrega em vez de apagar o que o outro gravou. Se os jogos acabarem depois do bloqueio, a página avisa e propõe prolongá-lo.
 
 **Ecrã TV do torneio:** `#/tv/torneio` (o torneio público de hoje) ou `#/tv/torneio/<id>`: jogos em cada campo, a seguir, classificações e quadro, cronómetro. Usa `torneio_tv()`, que não devolve contactos nem jogadores sem par; a tabela `torneios` só é lida pelo staff.
+
+## Material desportivo (`web/material/`)
+
+App do balcão de material (empréstimos de raquetes, bolas, sapatilhas…), trazida da app do Spa (`verdelago-spa/material-desportivo`, Firebase) para o Supabase, sem mudar a forma de trabalhar. Endereço: https://nunomavsilva.github.io/verdelago-sports/material/
+
+- **Fase 1 (atual):** Balcão (saída por quarto, raquetes numeradas, quem entrega, prazo), devoluções totais/parciais com danos e perdas, Material (estado de cada peça, fora de serviço), Histórico com Excel, Definições (só gestores). **Fase 2:** Análise e Relatório. **Fase 3:** taxas por atraso. A assinatura do hóspede também fica para depois.
+- **Dados:** `emprestimos` (documento `doc` igual ao da app original) e `material_config` (`main` = definições/inventário, `avarias` = peças fora de serviço). Realtime entre postos.
+- **Acesso por PIN:** cada posto é uma conta do Supabase com email interno e o PIN de 6 dígitos como palavra-passe (`sports@`, `spa@`, `frontdesk@posto.verdelago.com`), com linha em `staff` e `papel = 'posto'`. Gestores (`papel = 'gestor'`) entram com email e veem as Definições.
+- **Horas:** em Lisboa (`lx`/`lxTs`), seja qual for o fuso do tablet.
+- **Passar os dados da app antiga:** na app antiga, Definições → Cópia de segurança → Exportar; na nova, com conta de gestor, Definições → Importar dados de um ficheiro.
 
 ## Emails para os hóspedes (Brevo)
 

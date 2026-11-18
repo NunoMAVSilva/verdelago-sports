@@ -18,6 +18,7 @@ Responder ao utilizador em **português de Portugal**. A interface da receção 
 | Função de sincronização | `supabase/functions/sincronizar-quartos/index.ts` |
 | Emails (Brevo, remetente sports.center@verdelago.com) | `supabase/functions/enviar-email/` (chamada por `pg_net`; segredo `BREVO_API_KEY` no Supabase) |
 
+Material desportivo (balcão de empréstimos, PIN por posto): página própria `web/material/index.html` (vinda da app do Spa; tabelas `emprestimos` e `material_config`).
 Rotas do site: `#/` (reservar), `#/r/<token>` (reserva do hóspede), `#/rececao` (painel, login Supabase), `#/torneio/<id>` (gerir torneio, staff), `#/tv`, `#/tv/torneio[/<id>]`.
 Ficheiros: `core.js` (cliente Supabase, horas em Lisboa, grelha, diálogos), `hospede.js`, `rececao.js`, `torneio.js` (app dos torneios de pádel), `tv.js`, `main.js` (router), `style.css`, `vendor/supabase-2.118.0.js`.
 
