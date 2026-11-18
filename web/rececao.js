@@ -1,7 +1,7 @@
-// Painel da receção (#/rececao): login, grelha do dia, reservas/bloqueios, cacifos.
+// Painel da receção (#/rececao): login, grelha do dia, reservas/bloqueios, torneios, cacifos.
 import { sb, $, $$, esc, normQuarto, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, carregarBase, erroTexto, toast, dialogo, confirmar, grelha, LOGO } from './core.js';
 
-let ultImport = null, B = null, dia = hoje(), aba = 'grelha', itens = [], cacifos = [], usosAtivos = [], porPreparar = [], app = null, staffNome = '';
+let ultImport = null, B = null, dia = hoje(), aba = 'grelha', itens = [], cacifos = [], usosAtivos = [], porPreparar = [], torneios = [], app = null, staffNome = '';
 
 export async function paginaRececao(el) {
   app = el;
@@ -39,17 +39,18 @@ async function sair() { await sb.auth.signOut(); login(); }
 async function recarregar() {
   const ini = lisboa(dia, 0).toISOString(), fim = lisboa(addDias(dia, 1), 0).toISOString();
   const agora = new Date().toISOString(), ate = lisboa(addDias(hoje(), 2), 0).toISOString();
-  const [r, c, u, p, imp] = await Promise.all([
+  const [r, c, u, p, imp, t] = await Promise.all([
     sb.from('reservas').select('*, cacifo_usos(*)').eq('estado', 'confirmada').lt('inicio', fim).gt('fim', ini).order('inicio'),
     sb.from('cacifos').select('*').order('id'),
     sb.from('cacifo_usos').select('*, reservas(id, espaco_id, inicio, fim, quarto, apelido, nome, telefone, token)').eq('estado', 'preparado').order('cacifo_id'),
     sb.from('reservas').select('*, cacifo_usos(id, estado)').eq('estado', 'confirmada').eq('precisa_material', true).gt('fim', agora).lt('inicio', ate).order('inicio'),
     sb.from('importacoes').select('em, quartos, por').order('em', { ascending: false }).limit(1).maybeSingle(),
+    sb.from('torneios').select('*').or(`data.is.null,data.gte.${addDias(hoje(), -14)}`).order('data', { nullsFirst: true }).order('hora_inicio'),
   ]);
   ultImport = imp.data || null;
-  const err = r.error || c.error || u.error || p.error;
+  const err = r.error || c.error || u.error || p.error || t.error;
   if (err) { toast(erroTexto(err), 'erro'); return; }
-  itens = r.data; cacifos = c.data; usosAtivos = u.data;
+  itens = r.data; cacifos = c.data; usosAtivos = u.data; torneios = t.data;
   porPreparar = p.data.filter(x => !x.cacifo_usos.some(k => k.estado === 'preparado'));
   desenhar();
 }
@@ -68,13 +69,13 @@ function extra(r) {
 }
 
 function desenhar() {
-  const tabs = [['grelha', 'Grelha do dia'], ['cacifos', `Cacifos e material${porPreparar.length ? ` (${porPreparar.length})` : ''}`]];
+  const tabs = [['grelha', 'Grelha do dia'], ['torneios', 'Torneios'], ['cacifos', `Cacifos e material${porPreparar.length ? ` (${porPreparar.length})` : ''}`]];
   app.innerHTML = topo(`<span class="pill">${esc(staffNome)}</span><button class="btn small on-dark" id="b-sair">Sair</button>`) +
     `<nav class="tabs">${tabs.map(([k, l]) => `<a href="#/rececao" data-aba="${k}" class="${k === aba ? 'on' : ''}">${esc(l)}</a>`).join('')}<a class="tvlink" href="#/tv" target="_blank" rel="noopener">Ecrã TV ↗</a><a href="#/" target="_blank" rel="noopener">Página dos hóspedes ↗</a></nav>
-    <main class="largo">${aba === 'grelha' ? vGrelha() : vCacifos()}</main>`;
+    <main class="largo">${aba === 'grelha' ? vGrelha() : aba === 'torneios' ? vTorneios() : vCacifos()}</main>`;
   $('#b-sair').onclick = sair;
   $$('[data-aba]').forEach(a => a.onclick = e => { e.preventDefault(); aba = a.dataset.aba; desenhar(); });
-  if (aba === 'grelha') ligarGrelha(); else ligarCacifos();
+  if (aba === 'grelha') ligarGrelha(); else if (aba === 'torneios') ligarTorneios(); else ligarCacifos();
 }
 
 /* ---------- grelha ---------- */
@@ -201,9 +202,11 @@ function detalhe(r) {
         ${r.telefone ? `<a class="btn ghost small" target="_blank" rel="noopener" href="${esc(waLink(r.telefone, msgHospede(r, u)))}">Enviar por WhatsApp</a>` : ''}
         ${r.email ? `<a class="btn ghost small" href="mailto:${esc(r.email)}?subject=${encodeURIComponent('Reserva Verdelago Sports Center')}&body=${encodeURIComponent(msgHospede(r, u))}">Enviar por email</a>` : ''}
       </div></section>` : ''}
-    <div class="row between"><button class="btn ghost danger small" data-acao="cancelar">${res ? 'Cancelar reserva' : 'Remover bloqueio'}</button><button class="btn ghost small" data-fechar>Fechar</button></div>`,
+    ${r.tipo === 'torneio' ? '<p class="small muted">Bloqueio automático do torneio. Para mudar campos ou horas, edite o torneio.</p>' : ''}
+    <div class="row between">${r.tipo === 'torneio' ? '<button class="btn small" data-acao="torneio">Editar torneio</button>' : `<button class="btn ghost danger small" data-acao="cancelar">${res ? 'Cancelar reserva' : 'Remover bloqueio'}</button>`}<button class="btn ghost small" data-fechar>Fechar</button></div>`,
     (dlg, fechar) => {
       const acao = async (k) => {
+        if (k === 'torneio') { fechar(); editarTorneio(torneios.find(t => t.id === r.torneio_id) || (await sb.from('torneios').select('*').eq('id', r.torneio_id).single()).data); return; }
         if (k === 'copiar') { try { await navigator.clipboard.writeText(msgHospede(r, u)); toast('Mensagem copiada'); } catch { prompt('', msgHospede(r, u)); } return; }
         if (k === 'cancelar') {
           if (!await confirmar(res ? `Cancelar a reserva do quarto ${r.quarto}?` : 'Remover este bloqueio?', res ? 'Cancelar reserva' : 'Remover', true)) return;
@@ -235,6 +238,85 @@ function detalhe(r) {
         };
       }
     });
+}
+
+/* ---------- torneios (bloqueiam os campos automaticamente) ---------- */
+const hm = t => String(t || '').slice(0, 5);
+function diasTorneio(t) {
+  if (!t.data) return 'Sem data';
+  return t.data_fim && t.data_fim !== t.data ? `${dataCurta(t.data)} a ${dataCurta(t.data_fim)}` : dataLonga(t.data);
+}
+function vTorneios() {
+  const passou = t => t.data && (t.data_fim || t.data) < hoje();
+  const lista = ts => ts.length ? `<ul class="lista card">${ts.map(t => `<li><span><b class="cap">${esc(t.nome)}</b><br><span class="small"><span class="cap">${esc(diasTorneio(t))}</span> · ${hm(t.hora_inicio)}–${hm(t.hora_fim)} · ${t.espacos.length ? esc(t.espacos.map(nomeEsp).join(', ')) : '<span class="chip warn">sem campos</span>'}${t.publico ? '' : ' · <span class="chip">privado</span>'}</span></span>
+      <span class="row">${t.data ? `<button class="btn ghost small" data-ver="${t.id}">Ver na grelha</button>` : ''}<button class="btn ghost small" data-tor="${t.id}">Dias e campos</button><a class="btn small" href="#/torneio/${t.id}">Abrir torneio</a></span></li>`).join('')}</ul>` : '<p class="muted">Nenhum.</p>';
+  const prox = torneios.filter(t => !passou(t)), ant = torneios.filter(passou).reverse();
+  return `<section class="stack"><div class="row between"><h2>Próximos torneios</h2><button class="btn small" id="b-tor">+ Torneio</button></div>
+    <p class="small muted" style="margin:0">Em "Abrir torneio": inscrições, grupos, jogos, resultados, eliminatórias e ecrã TV (<a href="#/tv/torneio" target="_blank" rel="noopener">#/tv/torneio</a> mostra o torneio público do dia). Os campos escolhidos ficam bloqueados automaticamente nos dias e horas do torneio, e os hóspedes deixam de os poder reservar. Se já houver reservas nesse horário, o torneio não é gravado e aparece a lista para as resolver.</p>
+    ${lista(prox)}</section>
+    ${ant.length ? `<section class="stack"><h2>Últimas duas semanas</h2>${lista(ant)}</section>` : ''}`;
+}
+function ligarTorneios() {
+  $('#b-tor').onclick = () => editarTorneio(null);
+  $$('[data-tor]').forEach(b => b.onclick = () => editarTorneio(torneios.find(t => t.id === b.dataset.tor)));
+  $$('[data-ver]').forEach(b => b.onclick = () => { const t = torneios.find(x => x.id === b.dataset.ver); dia = t.data; aba = 'grelha'; recarregar(); });
+}
+// Também usado na página do torneio (torneio.js), com a base e o "depois" de lá.
+export function editarTorneio(t, Bx = B, depois = recarregar) {
+  const novoT = !t;
+  t = t || { nome: '', data: dia >= hoje() ? dia : hoje(), data_fim: null, hora_inicio: '09:00', hora_fim: '13:00', espacos: Bx.espacos.filter(e => e.modalidade === 'padel').map(e => e.id), publico: true, notas: '' };
+  const ini = Math.min(...Bx.espacos.map(e => e.abreMin)), fim = Math.max(...Bx.espacos.map(e => e.fechaMin));
+  const opH = (sel, de, ate) => { let h = ''; for (let m = de; m <= ate; m += 30) h += `<option value="${min2hm(m)}" ${min2hm(m) === hm(sel) ? 'selected' : ''}>${min2hm(m)}</option>`; return h; };
+  const padel = Bx.espacos.filter(e => e.modalidade === 'padel'), outros = Bx.espacos.filter(e => e.modalidade !== 'padel');
+  const chk = e => `<label><input type="checkbox" name="esp" value="${e.id}" ${t.espacos.includes(e.id) ? 'checked' : ''}> ${esc(e.nome)}</label>`;
+  dialogo(`<div class="row between"><h3>${novoT ? 'Novo torneio' : 'Editar torneio'}</h3><button class="x" data-fechar aria-label="Fechar">×</button></div>
+    <form class="stack" id="f-tor">
+      <label class="f" for="t-nome">Nome<input id="t-nome" name="nome" required maxlength="80" value="${esc(t.nome)}" placeholder="Ex.: Torneio de pádel de sábado"></label>
+      <div class="fgrid">
+        <label class="f" for="t-data">Dia<input id="t-data" name="data" type="date" required value="${esc(t.data || '')}"></label>
+        <label class="f" for="t-fim-d">Último dia (se for mais de um)<input id="t-fim-d" name="data_fim" type="date" value="${esc(t.data_fim || '')}"></label>
+        <label class="f" for="t-hi">Das<select id="t-hi" name="hi">${opH(t.hora_inicio, ini, fim - 30)}</select></label>
+        <label class="f" for="t-hf">Às<select id="t-hf" name="hf">${opH(t.hora_fim, ini + 30, fim)}</select></label>
+      </div>
+      <fieldset class="stack" style="border:0;padding:0;margin:0"><legend class="f" style="font-weight:600;margin-bottom:6px">Campos a bloquear</legend>
+        <div class="seg">${padel.map(chk).join('')}</div>
+        <div class="row"><button type="button" class="btn ghost small" data-todos="padel">Todos os de pádel</button><button type="button" class="btn ghost small" data-todos="">Nenhum</button></div>
+        ${outros.length ? `<div class="seg">${outros.map(chk).join('')}</div>` : ''}
+      </fieldset>
+      <label class="chk" for="t-pub"><input type="checkbox" id="t-pub" name="publico" ${t.publico ? 'checked' : ''}><span>Mostrar o nome do torneio aos hóspedes e no ecrã TV<small class="muted">Sem esta opção, os hóspedes e o ecrã TV veem só “Torneio”.</small></span></label>
+      <label class="f" for="t-notas">Notas<input id="t-notas" name="notas" value="${esc(t.notas || '')}"></label>
+      <p class="small erro-tor" role="alert" hidden style="color:var(--bad)"></p>
+      <div class="row between">${novoT ? '<span></span>' : '<button type="button" class="btn ghost danger small" id="t-apagar">Apagar torneio</button>'}<span class="row"><button type="button" class="btn ghost" data-fechar>Cancelar</button><button class="btn">Guardar</button></span></div>
+    </form>`, (dlg, fechar) => {
+    const f = dlg.querySelector('form'), el = f.elements, erro = dlg.querySelector('.erro-tor');
+    dlg.querySelectorAll('[data-todos]').forEach(b => b.onclick = () => {
+      dlg.querySelectorAll('[name=esp]').forEach(c => { c.checked = !!b.dataset.todos && Bx.espacos.find(e => e.id === c.value)?.modalidade === b.dataset.todos; });
+    });
+    f.onsubmit = async ev => {
+      ev.preventDefault(); erro.hidden = true;
+      const reg = {
+        nome: el.nome.value.trim(), data: el.data.value, data_fim: el.data_fim.value && el.data_fim.value !== el.data.value ? el.data_fim.value : null,
+        hora_inicio: el.hi.value, hora_fim: el.hf.value, espacos: $$('[name=esp]:checked', dlg).map(c => c.value),
+        publico: el.publico.checked, notas: el.notas.value.trim() || null,
+      };
+      const msg = !reg.nome ? 'Indique o nome.' : reg.hora_fim <= reg.hora_inicio ? 'A hora de fim tem de ser depois da de início.'
+        : reg.data_fim && reg.data_fim < reg.data ? 'O último dia tem de ser depois do primeiro.' : !reg.espacos.length ? 'Escolha pelo menos um campo.' : '';
+      if (msg) { erro.textContent = msg; erro.hidden = false; return; }
+      const q = novoT ? sb.from('torneios').insert(reg).select('id').single() : sb.from('torneios').update(reg).eq('id', t.id);
+      const { data: novo, error } = await q;
+      if (error) { erro.textContent = /torneios_datas_ck/.test(error.message) ? 'Um torneio pode ter no máximo 15 dias.' : erroTexto(error); erro.hidden = false; return; }
+      fechar(); toast(`Torneio guardado: ${reg.espacos.length} campo${reg.espacos.length === 1 ? '' : 's'} bloqueado${reg.espacos.length === 1 ? '' : 's'}.`);
+      if (novoT && novo) location.hash = `#/torneio/${novo.id}`; else depois();
+    };
+    const ap = dlg.querySelector('#t-apagar');
+    if (ap) ap.onclick = async () => {
+      if (!await confirmar(`Apagar o torneio "${t.nome}"? Os campos ficam livres para reserva.`, 'Apagar', true)) return;
+      const { error } = await sb.from('torneios').delete().eq('id', t.id);
+      if (error) { toast(erroTexto(error), 'erro'); return; }
+      toast('Torneio apagado. Campos livres.');
+      if (location.hash.startsWith('#/torneio/')) location.hash = '#/rececao'; else depois();
+    };
+  });
 }
 
 /* ---------- cacifos e material ---------- */

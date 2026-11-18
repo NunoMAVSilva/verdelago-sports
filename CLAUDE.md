@@ -17,14 +17,15 @@ Responder ao utilizador em **português de Portugal**. A interface da receção 
 | Esquema | `supabase/migrations/NNNN_*.sql` (aplicadas por ordem) |
 | Função de sincronização | `supabase/functions/sincronizar-quartos/index.ts` |
 
-Rotas do site: `#/` (reservar), `#/r/<token>` (reserva do hóspede), `#/rececao` (painel, login Supabase), `#/tv`.
-Ficheiros: `core.js` (cliente Supabase, horas em Lisboa, grelha, diálogos), `hospede.js`, `rececao.js`, `tv.js`, `main.js` (router), `style.css`, `vendor/supabase-2.118.0.js`.
+Rotas do site: `#/` (reservar), `#/r/<token>` (reserva do hóspede), `#/rececao` (painel, login Supabase), `#/torneio/<id>` (gerir torneio, staff), `#/tv`, `#/tv/torneio[/<id>]`.
+Ficheiros: `core.js` (cliente Supabase, horas em Lisboa, grelha, diálogos), `hospede.js`, `rececao.js`, `torneio.js` (app dos torneios de pádel), `tv.js`, `main.js` (router), `style.css`, `vendor/supabase-2.118.0.js`.
 
 ## Regras do domínio
 
 - 13 espaços: Pádel 1–8, Ténis 1–2, Futebol 7, Beach Volley, Polidesportivo. 08:00–22:00, **intervalos de 30 min**, duração 30–120 min (`espacos.passo_min`, `max_duracao_min`).
 - Sem pagamentos. Clientes = hóspedes (e proprietários, que contam como hóspedes).
 - Reservas, bloqueios e torneios estão todos na tabela `reservas` (`tipo`). Uma restrição de exclusão impede sobreposições.
+- **Torneios:** a tabela `torneios` tem dias, horas e `espacos[]`; o trigger `torneio_sincronizar` cria/acerta as linhas `tipo='torneio'` em `reservas` (não as editar à mão). Recusa gravar se houver marcações no caminho. Duplas, grupos, jogos e resultados ficam em `torneios.dados` (com contactos: só staff lê a tabela; o público usa `torneio_tv`).
 - Sem limite por quarto (`config.max_reservas_quarto_dia` = null).
 - **Cacifos:** fechaduras de combinação baratas. A receção põe o material, define o código e regista-o (`cacifo_usos`). O hóspede vê o código no link da reserva. Ao devolver, muda-se o código.
 - **Horas:** usar sempre os utilitários de `core.js` (`lisboa()`, `hora()`, `hoje()`) com fuso `Europe/Lisbon`, nunca o fuso do aparelho.
@@ -32,7 +33,7 @@ Ficheiros: `core.js` (cliente Supabase, horas em Lisboa, grelha, diálogos), `ho
 
 ## Segurança
 
-- Os hóspedes não leem tabelas (RLS). Só usam as funções `ocupacao`, `criar_reserva`, `ver_reserva` e `cancelar_reserva`. Staff = linha em `staff` (`e_staff()`).
+- Os hóspedes não leem tabelas (RLS). Só usam as funções `ocupacao`, `criar_reserva`, `ver_reserva`, `cancelar_reserva` e `torneio_tv`. Staff = linha em `staff` (`e_staff()`).
 - A chave em `core.js` é a **publishable**, que é pública. Nunca usar nem pôr no código a chave secreta/service_role.
 - O registo público de contas está desligado. Para dar acesso a alguém da receção: o utilizador cria a conta no painel do Supabase (Authentication → Users → Add user, *Auto Confirm*), e depois
   `insert into public.staff (user_id, nome) select id, 'Nome' from auth.users where email = '...';`

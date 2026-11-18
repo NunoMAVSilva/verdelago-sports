@@ -13,7 +13,7 @@ Base de dados: **Supabase** (`https://ncisfqhfxqumoadikupm.supabase.co`).
 | Quem | O quê |
 |---|---|
 | Hóspede (sem conta) | Vê a ocupação, reserva com **n.º do quarto + apelido + email**, recebe um link privado da reserva, pode cancelar até à hora de início. |
-| Receção (conta Supabase em `staff`) | Vê tudo, cria bloqueios e reservas, prepara cacifos (n.º + código), marca devoluções. |
+| Receção (conta Supabase em `staff`) | Vê tudo, cria bloqueios, reservas e torneios, prepara cacifos (n.º + código), marca devoluções. |
 | Ecrã TV / público | Ocupação do dia e torneios públicos. |
 
 ### Regras (tabela `config`)
@@ -29,7 +29,7 @@ Fechaduras de combinação reprogramável. A receção põe o material, define u
 
 ## Base de dados
 
-`supabase/migrations/`: aplicadas por ordem (0001 esquema inicial, 0002 slots de 30 min, 0003 estadias e validação do quarto). Já estão aplicadas no projeto.
+`supabase/migrations/`: aplicadas por ordem (0001 esquema inicial, 0002 slots de 30 min, 0003 estadias e validação do quarto, 0004 torneios a bloquear campos, 0005 app dos torneios). Já estão aplicadas no projeto.
 
 Os hóspedes não leem as tabelas diretamente (RLS). Só usam estas funções:
 
@@ -46,6 +46,14 @@ Os hóspedes não leem as tabelas diretamente (RLS). Só usam estas funções:
    insert into public.staff (user_id, nome)
    select id, 'Nome' from auth.users where email = 'pessoa@verdelago.com';
    ```
+
+### Torneios
+
+No painel, aba **Torneios**: nome, dia (ou vários dias seguidos), horas e campos. Um trigger na base de dados (`torneio_sincronizar`) cria um bloqueio `tipo = 'torneio'` em `reservas` por campo e por dia, e acerta-os quando o torneio é editado; apagar o torneio liberta os campos. Se já houver reservas ou bloqueios nesse horário, o torneio não é gravado e o erro diz quais são. Torneios não públicos aparecem só como "Torneio" aos hóspedes e no ecrã TV.
+
+**Gerir o torneio** (`#/torneio/<id>`, botão "Abrir torneio"; antes era um artefacto à parte): inscrições de duplas e individuais (com nível 1–6 e formação de duplas), grupos com cabeças de série ou sorteio, calendário pelos campos do torneio, resultados a tempo corrido com desempate, apuramento e quadro de eliminatórias, cronómetro. Tudo fica em `torneios.dados`; grava sozinho e, se outro aparelho alterou o torneio entretanto, recarrega em vez de apagar o que o outro gravou. Se os jogos acabarem depois do bloqueio, a página avisa e propõe prolongá-lo.
+
+**Ecrã TV do torneio:** `#/tv/torneio` (o torneio público de hoje) ou `#/tv/torneio/<id>`: jogos em cada campo, a seguir, classificações e quadro, cronómetro. Usa `torneio_tv()`, que não devolve contactos nem jogadores sem par; a tabela `torneios` só é lida pelo staff.
 
 ## Lista de hóspedes (Beach OPS)
 
@@ -64,7 +72,9 @@ Site estático (HTML + JS, sem build). Uma só página com rotas:
 | `#/` | Reservar (hóspedes, PT/EN, pensado para telemóvel) |
 | `#/r/<token>` | A reserva do hóspede: detalhes, cacifo e código, cancelar |
 | `#/rececao` | Painel da receção (login): grelha do dia, reservas e bloqueios, cacifos e material por preparar, mensagem para o hóspede por WhatsApp/email |
+| `#/torneio/<id>` | Gerir um torneio (staff): inscrições, grupos, jogos, eliminatórias |
 | `#/tv` | Ecrã TV: ocupação do dia, atualiza a cada minuto |
+| `#/tv/torneio` | Ecrã TV do torneio do dia (atualiza a cada 5 s) |
 
 Publicado em **https://nunomavsilva.github.io/verdelago-sports/** (GitHub Pages; cada push para `main` que mexa em `web/` publica automaticamente).
 
@@ -76,5 +86,6 @@ Testar localmente: `cd web && python3 -m http.server 8765` e abrir `http://local
 - [x] Publicar o site
 - [x] Validar o quarto com a lista de hóspedes do Opera (via Beach OPS)
 - [ ] Emails (confirmação e código do cacifo)
-- [ ] Torneios de pádel (a partir da app existente) a bloquear campos automaticamente
-- [ ] Ecrã TV com ocupação e torneios
+- [x] Torneios a bloquear campos automaticamente
+- [x] Quadros e resultados dos torneios de pádel (vindos da app em artefacto)
+- [x] Ecrã TV com ocupação e torneios
