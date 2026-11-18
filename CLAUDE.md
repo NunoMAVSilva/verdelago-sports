@@ -16,6 +16,7 @@ Responder ao utilizador em **português de Portugal**. A interface da receção 
 | Site (estático, sem build) | `web/` → GitHub Pages: https://nunomavsilva.github.io/verdelago-sports/ |
 | Esquema | `supabase/migrations/NNNN_*.sql` (aplicadas por ordem) |
 | Função de sincronização | `supabase/functions/sincronizar-quartos/index.ts` |
+| Emails (Brevo, remetente sports.center@verdelago.com) | `supabase/functions/enviar-email/` (chamada por `pg_net`; segredo `BREVO_API_KEY` no Supabase) |
 
 Rotas do site: `#/` (reservar), `#/r/<token>` (reserva do hóspede), `#/rececao` (painel, login Supabase), `#/torneio/<id>` (gerir torneio, staff), `#/tv`, `#/tv/torneio[/<id>]`.
 Ficheiros: `core.js` (cliente Supabase, horas em Lisboa, grelha, diálogos), `hospede.js`, `rececao.js`, `torneio.js` (app dos torneios de pádel), `tv.js`, `main.js` (router), `style.css`, `vendor/supabase-2.118.0.js`.
@@ -53,7 +54,7 @@ Depois de importar o In House ou o Arrivals, o Beach OPS chama `functions/v1/sin
   ```
   Cada pedido é uma transação separada. Testar com `begin; …; rollback;` num só pedido e não deixar dados de teste.
 - **Alterar o esquema:** criar uma nova `supabase/migrations/NNNN_descricao.sql`, aplicá-la com o comando acima e fazer commit. Ao recriar uma função com outra assinatura, refazer os `revoke`/`grant`.
-- **Publicar a função:**
+- **Publicar uma função** (para `enviar-email`, juntar também `-F "file=@modelo.ts;type=application/typescript"` e trocar o slug):
   ```bash
   cd supabase/functions/sincronizar-quartos && curl -sS -X POST "https://api.supabase.com/v1/projects/ncisfqhfxqumoadikupm/functions/deploy?slug=sincronizar-quartos" \
     -F 'metadata={"entrypoint_path":"index.ts","name":"sincronizar-quartos","verify_jwt":false};type=application/json' -F "file=@index.ts;type=application/typescript"

@@ -194,13 +194,14 @@ function detalhe(r) {
   const livres = cacifosLivres();
   dialogo(`<div class="row between"><h3>${esc(nomeEsp(r.espaco_id))} · ${hora(r.inicio)}–${hora(r.fim)}</h3><button class="x" data-fechar aria-label="Fechar">×</button></div>
     <dl class="dl">${res ? `<dt>Quarto</dt><dd>${esc(r.quarto)} · ${esc(r.apelido)}${r.nome ? ` (${esc(r.nome)})` : ''}</dd>
-      ${r.email ? `<dt>Email</dt><dd>${esc(r.email)}</dd>` : ''}${r.telefone ? `<dt>Telemóvel</dt><dd>${esc(r.telefone)}</dd>` : ''}
+      ${r.email ? `<dt>Email</dt><dd>${esc(r.email)}<br><span class="small muted">${r.email_confirmacao_em ? `Confirmação enviada ${esc(dataCurta(diaDe(r.email_confirmacao_em)))} às ${hora(r.email_confirmacao_em)}` : 'Confirmação por email ainda não enviada'}</span></dd>` : ''}${r.telefone ? `<dt>Telemóvel</dt><dd>${esc(r.telefone)}</dd>` : ''}
       ${r.jogadores ? `<dt>Jogadores</dt><dd>${r.jogadores}</dd>` : ''}<dt>Origem</dt><dd>${r.origem === 'online' ? 'Online' : 'Receção'}</dd>`
       : `<dt>Tipo</dt><dd>${r.tipo === 'torneio' ? 'Torneio' : 'Bloqueio'}</dd>${r.motivo ? `<dt>Motivo</dt><dd>${esc(r.motivo)}</dd>` : ''}`}
       ${r.notas ? `<dt>Notas</dt><dd>${esc(r.notas)}</dd>` : ''}</dl>
     ${res ? `<section class="stack cx">
       <h3>Cacifo</h3>
       ${u ? `<div class="cacifo-big small"><div><span>Cacifo</span><b>${u.cacifo_id}</b></div><div><span>Código</span><b>${esc(u.codigo)}</b></div>${u.material ? `<p>${esc(u.material)}</p>` : ''}</div>
+        <p class="small muted" style="margin:0">${u.notificado_em ? `Código enviado por email às ${hora(u.notificado_em)}.` : r.email ? 'Código ainda não enviado por email.' : 'Sem email: envie o código por WhatsApp ou mensagem.'}</p>
         <div class="row"><button class="btn small" data-acao="devolvido">Material devolvido</button><button class="btn ghost small" data-acao="retirar">Retirar do cacifo</button></div>`
       : `<form class="stack" id="f-cacifo">
           ${r.precisa_material ? '<p class="small">🎒 O hóspede pediu material.</p>' : ''}

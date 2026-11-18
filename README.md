@@ -29,7 +29,7 @@ Fechaduras de combinação reprogramável. A receção põe o material, define u
 
 ## Base de dados
 
-`supabase/migrations/`: aplicadas por ordem (0001 esquema inicial, 0002 slots de 30 min, 0003 estadias e validação do quarto, 0004 torneios a bloquear campos, 0005 app dos torneios, 0006 Realtime). Já estão aplicadas no projeto.
+`supabase/migrations/`: aplicadas por ordem (0001 esquema inicial, 0002 slots de 30 min, 0003 estadias e validação do quarto, 0004 torneios a bloquear campos, 0005 app dos torneios, 0006 Realtime, 0007 emails). Já estão aplicadas no projeto.
 
 Os hóspedes não leem as tabelas diretamente (RLS). Só usam estas funções:
 
@@ -54,6 +54,16 @@ No painel, aba **Torneios**: nome, dia (ou vários dias seguidos), horas e campo
 **Gerir o torneio** (`#/torneio/<id>`, botão "Abrir torneio"; antes era um artefacto à parte): inscrições de duplas e individuais (com nível 1–6 e formação de duplas), grupos com cabeças de série ou sorteio, calendário pelos campos do torneio, resultados a tempo corrido com desempate, apuramento e quadro de eliminatórias, cronómetro. Tudo fica em `torneios.dados`; grava sozinho e, se outro aparelho alterou o torneio entretanto, recarrega em vez de apagar o que o outro gravou. Se os jogos acabarem depois do bloqueio, a página avisa e propõe prolongá-lo.
 
 **Ecrã TV do torneio:** `#/tv/torneio` (o torneio público de hoje) ou `#/tv/torneio/<id>`: jogos em cada campo, a seguir, classificações e quadro, cronómetro. Usa `torneio_tv()`, que não devolve contactos nem jogadores sem par; a tabela `torneios` só é lida pelo staff.
+
+## Emails para os hóspedes (Brevo)
+
+A função `supabase/functions/enviar-email` envia, a partir de **sports.center@verdelago.com**:
+- a confirmação da reserva (com o link para ver ou cancelar), quando se cria uma reserva com email (online ou pela receção);
+- o número e o código do cacifo, quando a receção prepara o cacifo.
+
+A base de dados avisa a função com `pg_net` (migração 0007). A função lê os dados com a chave de serviço e envia uma só vez (`reservas.email_confirmacao_em`, `cacifo_usos.notificado_em`, visíveis no painel). O email é em PT e EN.
+
+**Configuração (uma vez):** conta Brevo → autenticar o domínio `verdelago.com` (registos DNS DKIM/DMARC que o Brevo indica) → adicionar o remetente `sports.center@verdelago.com` → criar uma chave API → guardá-la no Supabase em *Edge Functions › Secrets* com o nome `BREVO_API_KEY`. Sem chave, a função não envia nada.
 
 ## Lista de hóspedes (Beach OPS)
 
@@ -85,7 +95,7 @@ Testar localmente: `cd web && python3 -m http.server 8765` e abrir `http://local
 - [x] App web: reservas (hóspedes), painel da receção, cacifos
 - [x] Publicar o site
 - [x] Validar o quarto com a lista de hóspedes do Opera (via Beach OPS)
-- [ ] Emails (confirmação e código do cacifo)
+- [x] Emails (confirmação e código do cacifo): falta a chave do Brevo
 - [x] Torneios a bloquear campos automaticamente
 - [x] Quadros e resultados dos torneios de pádel (vindos da app em artefacto)
 - [x] Ecrã TV com ocupação e torneios
