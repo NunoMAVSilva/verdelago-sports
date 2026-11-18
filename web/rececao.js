@@ -1,7 +1,7 @@
 // Painel da receção (#/rececao): login, grelha do dia, reservas/bloqueios, torneios, cacifos.
 import { sb, $, $$, esc, autoAtualizar, normQuarto, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, carregarBase, erroTexto, toast, dialogo, confirmar, grelha, LOGO } from './core.js';
 
-let ultImport = null, B = null, dia = hoje(), aba = 'grelha', itens = [], cacifos = [], usosAtivos = [], porPreparar = [], torneios = [], app = null, staffNome = '';
+let ultImport = null, B = null, dia = hoje(), aba = 'grelha', itens = [], cacifos = [], usosAtivos = [], porPreparar = [], naoDevolvidos = [], torneios = [], app = null, staffNome = '';
 
 export async function paginaRececao(el) {
   app = el;
@@ -49,18 +49,19 @@ async function sair() { pararRececao(); await sb.auth.signOut(); location.reload
 async function recarregar(manter = false) {
   const ini = lisboa(dia, 0).toISOString(), fim = lisboa(addDias(dia, 1), 0).toISOString();
   const agora = new Date().toISOString(), ate = lisboa(addDias(hoje(), 2), 0).toISOString();
-  const [r, c, u, p, imp, t] = await Promise.all([
+  const [r, c, u, p, imp, t, nd] = await Promise.all([
     sb.from('reservas').select('*, cacifo_usos(*)').eq('estado', 'confirmada').lt('inicio', fim).gt('fim', ini).order('inicio'),
     sb.from('cacifos').select('*').order('id'),
     sb.from('cacifo_usos').select('*, reservas(id, espaco_id, inicio, fim, quarto, apelido, nome, telefone, token)').eq('estado', 'preparado').order('cacifo_id'),
     sb.from('reservas').select('*, cacifo_usos(id, estado)').eq('estado', 'confirmada').eq('precisa_material', true).gt('fim', agora).lt('inicio', ate).order('inicio'),
     sb.from('importacoes').select('em, quartos, por').order('em', { ascending: false }).limit(1).maybeSingle(),
     sb.from('torneios').select('*').or(`data.is.null,data.gte.${addDias(hoje(), -14)}`).order('data', { nullsFirst: true }).order('hora_inicio'),
+    sb.from('cacifo_usos').select('*, reservas(id, espaco_id, inicio, quarto, apelido, nome, telefone, email)').eq('estado', 'nao_devolvido').gt('nao_devolvido_em', lisboa(addDias(hoje(), -30), 0).toISOString()).order('nao_devolvido_em', { ascending: false }),
   ]);
   ultImport = imp.data || null;
-  const err = r.error || c.error || u.error || p.error || t.error;
+  const err = r.error || c.error || u.error || p.error || t.error || nd.error;
   if (err) { toast(erroTexto(err), 'erro'); return; }
-  itens = r.data; cacifos = c.data; usosAtivos = u.data; torneios = t.data;
+  itens = r.data; cacifos = c.data; usosAtivos = u.data; torneios = t.data; naoDevolvidos = nd.data;
   porPreparar = p.data.filter(x => !x.cacifo_usos.some(k => k.estado === 'preparado'));
   if (!manter) return desenhar();
   // atualização automática: manter a posição na página e na grelha
@@ -71,7 +72,7 @@ async function recarregar(manter = false) {
 const nomeEsp = id => B.espacos.find(e => e.id === id)?.nome || id;
 const usoAtivo = r => (r.cacifo_usos || []).find(u => u.estado === 'preparado');
 function rotulo(r) {
-  if (r.tipo === 'reserva') return `Q${r.quarto} ${r.apelido}`;
+  if (r.tipo === 'reserva') return `${r.quarto} ${r.apelido}`;
   if (r.tipo === 'torneio') return r.motivo || 'Torneio';
   return r.motivo || 'Bloqueado';
 }
@@ -202,7 +203,7 @@ function detalhe(r) {
       <h3>Cacifo</h3>
       ${u ? `<div class="cacifo-big small"><div><span>Cacifo</span><b>${u.cacifo_id}</b></div><div><span>Código</span><b>${esc(u.codigo)}</b></div>${u.material ? `<p>${esc(u.material)}</p>` : ''}</div>
         <p class="small muted" style="margin:0">${u.notificado_em ? `Código enviado por email às ${hora(u.notificado_em)}.` : r.email ? 'Código ainda não enviado por email.' : 'Sem email: envie o código por WhatsApp ou mensagem.'}</p>
-        <div class="row"><button class="btn small" data-acao="devolvido">Material devolvido</button><button class="btn ghost small" data-acao="retirar">Retirar do cacifo</button></div>`
+        <div class="row"><button class="btn small" data-acao="devolvido">Material devolvido</button><button class="btn ghost danger small" data-acao="nao_devolvido">Não devolvido</button><button class="btn ghost small" data-acao="retirar">Retirar do cacifo</button></div>`
       : `<form class="stack" id="f-cacifo">
           ${r.precisa_material ? '<p class="small">🎒 O hóspede pediu material.</p>' : ''}
           <div class="fgrid">
@@ -230,6 +231,7 @@ function detalhe(r) {
           if (error) { toast(erroTexto(error), 'erro'); return; }
           toast(res ? 'Reserva cancelada' : 'Bloqueio removido'); recarregar(); return;
         }
+        if (k === 'nao_devolvido') { fechar(); naoDevolvido(u, r); return; }
         if (k === 'devolvido' || k === 'retirar') {
           const upd = k === 'devolvido' ? { estado: 'devolvido', devolvido_em: new Date().toISOString() } : { estado: 'cancelado' };
           const { error } = await sb.from('cacifo_usos').update(upd).eq('id', u.id);
@@ -338,22 +340,56 @@ export function editarTorneio(t, Bx = B, depois = recarregar) {
 function vCacifos() {
   const usoDe = id => usosAtivos.find(u => u.cacifo_id === id);
   return `<section class="stack"><h2>Material por preparar</h2>
-    ${porPreparar.length ? `<ul class="lista card">${porPreparar.map(r => `<li><span><b>${esc(dataCurta(diaDe(r.inicio)))} ${hora(r.inicio)}</b> · ${esc(nomeEsp(r.espaco_id))} · Q${esc(r.quarto)} ${esc(r.apelido)}${r.notas ? ` <span class="muted small">· ${esc(r.notas)}</span>` : ''}</span><button class="btn small" data-prep="${r.id}">Preparar cacifo</button></li>`).join('')}</ul>`
+    ${porPreparar.length ? `<ul class="lista card">${porPreparar.map(r => `<li><span><b>${esc(dataCurta(diaDe(r.inicio)))} ${hora(r.inicio)}</b> · ${esc(nomeEsp(r.espaco_id))} · ${esc(r.quarto)} ${esc(r.apelido)}${r.notas ? ` <span class="muted small">· ${esc(r.notas)}</span>` : ''}</span><button class="btn small" data-prep="${r.id}">Preparar cacifo</button></li>`).join('')}</ul>`
       : '<p class="muted">Nada por preparar hoje e amanhã.</p>'}</section>
     <section class="stack"><h2>Cacifos</h2><div class="cacifos">${cacifos.map(c => {
       const u = usoDe(c.id), r = u?.reservas;
       return `<div class="cacifo ${u ? 'ocup' : ''} ${c.ativo ? '' : 'inativo'}"><div class="row between"><b class="cn">${c.id}</b><span class="chip ${u ? 'warn' : 'ok'}">${!c.ativo ? 'Inativo' : u ? 'Ocupado' : 'Livre'}</span></div>
         <span class="small muted">${c.tamanho === 'grande' ? 'Grande' : 'Médio'}</span>
-        ${u && r ? `<div class="small">Q${esc(r.quarto)} ${esc(r.apelido)} · ${esc(nomeEsp(r.espaco_id))}<br>${esc(dataCurta(diaDe(r.inicio)))} ${hora(r.inicio)} · código <b>${esc(u.codigo)}</b>${u.material ? `<br>${esc(u.material)}` : ''}</div>
-          <button class="btn small" data-dev="${u.id}">Devolvido</button>` : ''}</div>`;
+        ${u && r ? `<div class="small">${esc(r.quarto)} ${esc(r.apelido)} · ${esc(nomeEsp(r.espaco_id))}<br>${esc(dataCurta(diaDe(r.inicio)))} ${hora(r.inicio)} · código <b>${esc(u.codigo)}</b>${u.material ? `<br>${esc(u.material)}` : ''}</div>
+          <div class="row"><button class="btn small" data-dev="${u.id}">Devolvido</button><button class="btn ghost danger small" data-nd="${u.id}">Não devolvido</button></div>` : ''}</div>`;
     }).join('')}</div>
-    <p class="small muted">Depois de cada devolução, mude o código da fechadura antes de voltar a usar o cacifo.</p></section>`;
+    <p class="small muted">Depois de cada devolução, mude o código da fechadura antes de voltar a usar o cacifo. Se o material não for devolvido, use "Não devolvido": a receção do resort recebe um email com os dados do hóspede.</p></section>
+    <section class="stack"><h2>Material não devolvido (30 dias)</h2>
+    ${naoDevolvidos.length ? `<ul class="lista card">${naoDevolvidos.map(x => { const r = x.reservas || {};
+      return `<li><span><b>${esc(r.quarto)} ${esc(r.apelido)}</b> · cacifo ${x.cacifo_id} · ${esc(dataCurta(diaDe(x.nao_devolvido_em)))} ${hora(x.nao_devolvido_em)}<br><span class="small">${esc(x.falta || x.material || '')}</span>
+        <span class="small muted">· ${x.aviso_rececao_em ? `receção avisada às ${hora(x.aviso_rececao_em)}` : 'aviso por enviar'}</span></span>
+        <button class="btn ghost small" data-afinal="${x.id}">Afinal foi devolvido</button></li>`; }).join('')}</ul>` : '<p class="muted">Nenhum caso.</p>'}</section>`;
 }
 function ligarCacifos() {
   $$('[data-prep]').forEach(b => b.onclick = () => detalhe(porPreparar.find(r => r.id === b.dataset.prep)));
+  $$('[data-nd]').forEach(b => b.onclick = () => { const u = usosAtivos.find(x => x.id === b.dataset.nd); if (u) naoDevolvido(u, u.reservas); });
+  $$('[data-afinal]').forEach(b => b.onclick = async () => {
+    if (!await confirmar('Marcar como devolvido? Avise também a receção do resort de que já não há nada a cobrar.', 'Foi devolvido', false)) return;
+    const { error } = await sb.from('cacifo_usos').update({ estado: 'devolvido', devolvido_em: new Date().toISOString() }).eq('id', b.dataset.afinal);
+    if (error) { toast(erroTexto(error), 'erro'); return; }
+    toast('Marcado como devolvido.'); recarregar();
+  });
   $$('[data-dev]').forEach(b => b.onclick = async () => {
     const { error } = await sb.from('cacifo_usos').update({ estado: 'devolvido', devolvido_em: new Date().toISOString() }).eq('id', b.dataset.dev);
     if (error) { toast(erroTexto(error), 'erro'); return; }
     toast('Cacifo livre. Lembre-se de mudar o código.'); recarregar();
+  });
+}
+
+/* ---------- material não devolvido: avisa a receção do resort por email ---------- */
+function naoDevolvido(u, r) {
+  dialogo(`<div class="row between"><h3>Material não devolvido · cacifo ${u.cacifo_id}</h3><button class="x" data-fechar aria-label="Fechar">×</button></div>
+    <p style="margin:0">Quarto <b>${esc(r?.quarto || '')}</b> · ${esc(r?.apelido || '')}${r?.nome ? ` (${esc(r.nome)})` : ''}${r ? ` · ${esc(nomeEsp(r.espaco_id))}, ${esc(dataCurta(diaDe(r.inicio)))} ${hora(r.inicio)}` : ''}</p>
+    <form class="stack" id="f-nd">
+      <label class="f" for="nd-falta">O que não foi devolvido<textarea id="nd-falta" name="falta" rows="3" required>${esc(u.material || '')}</textarea></label>
+      <p class="small muted" style="margin:0">A receção do resort recebe um email com o quarto, o nome e os contactos do hóspede, para o contactar ou efetuar a cobrança. O cacifo fica livre: mude o código da fechadura.</p>
+      <div class="row end"><button type="button" class="btn ghost" data-fechar>Cancelar</button><button class="btn danger">Registar e avisar a receção</button></div>
+    </form>`, (dlg, fechar) => {
+    const f = dlg.querySelector('form');
+    f.onsubmit = async ev => {
+      ev.preventDefault();
+      const falta = f.elements.falta.value.trim();
+      if (!falta) { toast('Indique o que não foi devolvido.', 'erro'); return; }
+      const { data: { user } } = await sb.auth.getUser();
+      const { error } = await sb.from('cacifo_usos').update({ estado: 'nao_devolvido', nao_devolvido_em: new Date().toISOString(), falta, marcado_por: user?.id || null }).eq('id', u.id).eq('estado', 'preparado');
+      if (error) { toast(erroTexto(error), 'erro'); return; }
+      fechar(); toast(`Registado. A receção do resort vai receber o aviso. Cacifo ${u.cacifo_id} livre: mude o código.`); recarregar();
+    };
   });
 }
