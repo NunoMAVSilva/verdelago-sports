@@ -79,6 +79,26 @@ export function erroTexto(e) {
   return m;
 }
 
+/* ---------- atualização automática ---------- */
+// Corre fn de `ms` em `ms` e ao voltar ao separador, mas só quando podeAgora() (sem diálogo aberto,
+// sem estar a escrever). Devolve uma função que pede uma atualização na próxima oportunidade.
+let autos = [];
+export const ocupado = () => !!document.getElementById('modal')?.innerHTML || !!document.activeElement?.matches('input,select,textarea');
+export function autoAtualizar(fn, ms, podeAgora = () => !ocupado()) {
+  let ultima = Date.now(), pedido = false, aCorrer = false;
+  const tick = async () => {
+    if (aCorrer || document.hidden || !(pedido || Date.now() - ultima >= ms) || !podeAgora()) return;
+    aCorrer = true; pedido = false; ultima = Date.now();
+    try { await fn(); } finally { aCorrer = false; }
+  };
+  const vis = () => { if (!document.hidden) { pedido = true; tick(); } };
+  const id = setInterval(tick, Math.min(ms, 3000));
+  document.addEventListener('visibilitychange', vis);
+  autos.push(() => { clearInterval(id); document.removeEventListener('visibilitychange', vis); });
+  return () => { pedido = true; tick(); };
+}
+export function pararAuto() { autos.forEach(f => f()); autos = []; }
+
 /* ---------- interface ---------- */
 export function toast(t, tipo = '') {
   let el = $('#toast');

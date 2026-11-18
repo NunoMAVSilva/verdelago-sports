@@ -29,7 +29,7 @@ Fechaduras de combinação reprogramável. A receção põe o material, define u
 
 ## Base de dados
 
-`supabase/migrations/`: aplicadas por ordem (0001 esquema inicial, 0002 slots de 30 min, 0003 estadias e validação do quarto, 0004 torneios a bloquear campos, 0005 app dos torneios). Já estão aplicadas no projeto.
+`supabase/migrations/`: aplicadas por ordem (0001 esquema inicial, 0002 slots de 30 min, 0003 estadias e validação do quarto, 0004 torneios a bloquear campos, 0005 app dos torneios, 0006 Realtime). Já estão aplicadas no projeto.
 
 Os hóspedes não leem as tabelas diretamente (RLS). Só usam estas funções:
 
@@ -71,9 +71,9 @@ Site estático (HTML + JS, sem build). Uma só página com rotas:
 |---|---|
 | `#/` | Reservar (hóspedes, PT/EN, pensado para telemóvel) |
 | `#/r/<token>` | A reserva do hóspede: detalhes, cacifo e código, cancelar |
-| `#/rececao` | Painel da receção (login): grelha do dia, reservas e bloqueios, cacifos e material por preparar, mensagem para o hóspede por WhatsApp/email |
+| `#/rececao` | Painel da receção (login; atualiza sozinho via Supabase Realtime e de 30 em 30 s): grelha do dia, reservas e bloqueios, cacifos e material por preparar, mensagem para o hóspede por WhatsApp/email |
 | `#/torneio/<id>` | Gerir um torneio (staff): inscrições, grupos, jogos, eliminatórias |
-| `#/tv` | Ecrã TV: ocupação do dia, atualiza a cada minuto |
+| `#/tv` | Ecrã TV: ocupação do dia, atualiza de 20 em 20 s |
 | `#/tv/torneio` | Ecrã TV do torneio do dia (atualiza a cada 5 s) |
 
 Publicado em **https://nunomavsilva.github.io/verdelago-sports/** (GitHub Pages; cada push para `main` que mexa em `web/` publica automaticamente).
