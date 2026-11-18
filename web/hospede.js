@@ -1,5 +1,5 @@
 // Páginas do hóspede: reservar (#/) e ver/cancelar reserva (#/r/<token>). PT/EN.
-import { sb, $, esc, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, MODALIDADES, nomeMod, carregarBase, erroTexto, toast, confirmar, LOGO } from './core.js';
+import { sb, $, esc, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, MODALIDADES, nomeMod, carregarBase, erroTexto, toast, confirmar, LOGO, autoAtualizar, ocupado } from './core.js';
 
 const TXT = {
   pt: {
@@ -82,6 +82,9 @@ export async function paginaReservar(app) {
   S.dia = S.dia || hoje();
   await carregarOcupacao();
   desenhar(app);
+  // Disponibilidade sempre fresca, sem estragar um formulário a meio.
+  autoAtualizar(async () => { await carregarOcupacao(); desenhar(app); }, 60000,
+    () => !ocupado() && ![...document.querySelectorAll('#app form input, #app form textarea')].some(i => i.type === 'checkbox' ? i.checked : i.value.trim()));
 }
 async function carregarOcupacao() {
   S.aCarregar = true;

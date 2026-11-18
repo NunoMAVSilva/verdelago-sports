@@ -1,5 +1,5 @@
 // Painel da receção (#/rececao): login, grelha do dia, reservas/bloqueios, torneios, cacifos.
-import { sb, $, $$, esc, normQuarto, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, carregarBase, erroTexto, toast, dialogo, confirmar, grelha, LOGO } from './core.js';
+import { sb, $, $$, esc, autoAtualizar, normQuarto, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, carregarBase, erroTexto, toast, dialogo, confirmar, grelha, LOGO } from './core.js';
 
 let ultImport = null, B = null, dia = hoje(), aba = 'grelha', itens = [], cacifos = [], usosAtivos = [], porPreparar = [], torneios = [], app = null, staffNome = '';
 
@@ -17,7 +17,17 @@ export async function paginaRececao(el) {
   staffNome = st?.nome || session.user.email;
   try { B = await carregarBase(); } catch (e) { toast(erroTexto(e), 'erro'); return; }
   await recarregar();
+  // Atualiza sozinho: na hora (Realtime) e, por segurança, de 30 em 30 s.
+  const pedir = autoAtualizar(() => recarregar(true), 30000);
+  pararRececao();
+  canal = sb.channel('rececao')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'reservas' }, pedir)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'cacifo_usos' }, pedir)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'torneios' }, pedir)
+    .subscribe();
 }
+let canal = null;
+export function pararRececao() { if (canal) { sb.removeChannel(canal); canal = null; } }
 function topo(extra = '') {
   return `<header class="top"><div class="brand">${LOGO}<div><div class="eyebrow">Verdelago · Sports Center</div><div class="tname">Receção</div></div></div><div class="top-r">${extra}</div></header>`;
 }
@@ -34,9 +44,9 @@ function login() {
     paginaRececao(app);
   };
 }
-async function sair() { await sb.auth.signOut(); login(); }
+async function sair() { pararRececao(); await sb.auth.signOut(); location.reload(); }
 
-async function recarregar() {
+async function recarregar(manter = false) {
   const ini = lisboa(dia, 0).toISOString(), fim = lisboa(addDias(dia, 1), 0).toISOString();
   const agora = new Date().toISOString(), ate = lisboa(addDias(hoje(), 2), 0).toISOString();
   const [r, c, u, p, imp, t] = await Promise.all([
@@ -52,7 +62,11 @@ async function recarregar() {
   if (err) { toast(erroTexto(err), 'erro'); return; }
   itens = r.data; cacifos = c.data; usosAtivos = u.data; torneios = t.data;
   porPreparar = p.data.filter(x => !x.cacifo_usos.some(k => k.estado === 'preparado'));
+  if (!manter) return desenhar();
+  // atualização automática: manter a posição na página e na grelha
+  const w = $('.grelha-wrap'), y = scrollY, gt = w?.scrollTop, gl = w?.scrollLeft;
   desenhar();
+  scrollTo(0, y); const w2 = $('.grelha-wrap'); if (w2 && w) { w2.scrollTop = gt; w2.scrollLeft = gl; }
 }
 const nomeEsp = id => B.espacos.find(e => e.id === id)?.nome || id;
 const usoAtivo = r => (r.cacifo_usos || []).find(u => u.estado === 'preparado');

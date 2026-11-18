@@ -3,12 +3,14 @@ import { paginaReservar, paginaReserva } from './hospede.js';
 import { paginaRececao } from './rececao.js';
 import { paginaTV, pararTV } from './tv.js';
 import { paginaTorneio, paginaTVTorneio, pararTorneio } from './torneio.js';
+import { pararAuto } from './core.js';
+import { pararRececao } from './rececao.js';
 
 const app = document.getElementById('app');
 function rota() {
   document.getElementById('modal').innerHTML = '';
   const h = location.hash.replace(/^#\/?/, '');
-  pararTV(); pararTorneio();
+  pararTV(); pararTorneio(); pararAuto(); pararRececao();
   if (h.startsWith('r/')) return paginaReserva(app, decodeURIComponent(h.slice(2)));
   if (h === 'rececao') return paginaRececao(app);
   if (h.startsWith('torneio/')) return paginaTorneio(app, decodeURIComponent(h.slice(8)));

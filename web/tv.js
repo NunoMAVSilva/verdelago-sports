@@ -1,5 +1,5 @@
-// Ecrã TV (#/tv): ocupação de hoje em todos os espaços, atualiza sozinho.
-import { sb, $, esc, hoje, dataLonga, carregarBase, grelha, erroTexto, LOGO } from './core.js';
+// Ecrã TV (#/tv): ocupação de hoje em todos os espaços, atualiza de 20 em 20 s.
+import { sb, $, esc, hoje, dataLonga, carregarBase, grelha, erroTexto, LOGO, autoAtualizar } from './core.js';
 
 let timers = [];
 export function pararTV() { timers.forEach(clearInterval); timers = []; document.body.classList.remove('tv'); }
@@ -22,5 +22,6 @@ export async function paginaTV(app) {
   };
   const relogio = () => { const el = $('#tvclock'); if (el) el.textContent = new Intl.DateTimeFormat('pt-PT', { timeZone: 'Europe/Lisbon', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date()); };
   await desenhar();
-  timers.push(setInterval(desenhar, 60000), setInterval(relogio, 1000));
+  autoAtualizar(desenhar, 20000, () => true);
+  timers.push(setInterval(relogio, 1000));
 }
