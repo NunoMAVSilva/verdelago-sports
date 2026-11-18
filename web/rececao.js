@@ -86,7 +86,7 @@ function extra(r) {
 function desenhar() {
   const tabs = [['grelha', 'Grelha do dia'], ['torneios', 'Torneios'], ['cacifos', `Cacifos e material${porPreparar.length ? ` (${porPreparar.length})` : ''}`]];
   app.innerHTML = topo(`<span class="pill">${esc(staffNome)}</span><button class="btn small on-dark" id="b-sair">Sair</button>`) +
-    `<nav class="tabs">${tabs.map(([k, l]) => `<a href="#/rececao" data-aba="${k}" class="${k === aba ? 'on' : ''}">${esc(l)}</a>`).join('')}<a class="tvlink" href="#/tv" target="_blank" rel="noopener">Ecrã TV ↗</a><a href="#/" target="_blank" rel="noopener">Página dos hóspedes ↗</a></nav>
+    `<nav class="tabs">${tabs.map(([k, l]) => `<a href="#/rececao" data-aba="${k}" class="${k === aba ? 'on' : ''}">${esc(l)}</a>`).join('')}<a class="tvlink" href="material/">Material desportivo ↗</a><a href="#/tv" target="_blank" rel="noopener">Ecrã TV ↗</a><a href="#/" target="_blank" rel="noopener">Página dos hóspedes ↗</a></nav>
     <main class="largo">${aba === 'grelha' ? vGrelha() : aba === 'torneios' ? vTorneios() : vCacifos()}</main>`;
   $('#b-sair').onclick = sair;
   $$('[data-aba]').forEach(a => a.onclick = e => { e.preventDefault(); aba = a.dataset.aba; desenhar(); });
