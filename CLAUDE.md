@@ -28,7 +28,7 @@ Ficheiros: `core.js` (cliente Supabase, horas em Lisboa, grelha, diálogos), `ho
 - Reservas, bloqueios e torneios estão todos na tabela `reservas` (`tipo`). Uma restrição de exclusão impede sobreposições.
 - **Torneios:** a tabela `torneios` tem dias, horas e `espacos[]`; o trigger `torneio_sincronizar` cria/acerta as linhas `tipo='torneio'` em `reservas` (não as editar à mão). Recusa gravar se houver marcações no caminho. Duplas, grupos, jogos e resultados ficam em `torneios.dados` (com contactos: só staff lê a tabela; o público usa `torneio_tv`).
 - Sem limite por quarto (`config.max_reservas_quarto_dia` = null).
-- **Cacifos:** fechaduras de combinação baratas. A receção põe o material, define o código e regista-o (`cacifo_usos`). O hóspede vê o código no link da reserva. Ao devolver, muda-se o código.
+- **Cacifos:** fechaduras de combinação baratas. A receção põe o material, define o código e regista-o (`cacifo_usos`). O hóspede vê o código no link da reserva. Ao devolver, muda-se o código. "Não devolvido" (`cacifo_usos.estado='nao_devolvido'`) envia um aviso à receção do resort (`config.email_rececao`).
 - **Horas:** usar sempre os utilitários de `core.js` (`lisboa()`, `hora()`, `hoje()`) com fuso `Europe/Lisbon`, nunca o fuso do aparelho.
 - **Quartos** no formato do Opera: `A123`, `T045`, `V12` (`norm_quarto` em SQL, `normQuarto` em JS, igual ao `normRoom` do Beach OPS).
 

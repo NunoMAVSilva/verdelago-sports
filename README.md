@@ -27,9 +27,11 @@ Base de dados: **Supabase** (`https://ncisfqhfxqumoadikupm.supabase.co`).
 
 Fechaduras de combinação reprogramável. A receção põe o material, define um código novo e regista-o na app (`cacifo_usos`). O hóspede vê o cacifo e o código na página da reserva (e por email). Ao devolver, a receção marca como devolvido e muda o código. Um cacifo só pode estar associado a uma reserva de cada vez.
 
+**Material não devolvido:** no cacifo (ou no detalhe da reserva), "Não devolvido" regista o que falta e a receção do resort (`config.email_rececao`, hoje frontdesk@verdelago.com) recebe um email com o quarto, o nome e os contactos do hóspede para o contactar ou cobrar; responder ao email escreve ao hóspede. O cacifo fica livre. Os casos dos últimos 30 dias aparecem em Cacifos e material.
+
 ## Base de dados
 
-`supabase/migrations/`: aplicadas por ordem (0001 esquema inicial, 0002 slots de 30 min, 0003 estadias e validação do quarto, 0004 torneios a bloquear campos, 0005 app dos torneios, 0006 Realtime, 0007 emails). Já estão aplicadas no projeto.
+`supabase/migrations/`: aplicadas por ordem (0001 esquema inicial, 0002 slots de 30 min, 0003 estadias e validação do quarto, 0004 torneios a bloquear campos, 0005 app dos torneios, 0006 Realtime, 0007 emails, 0008 material não devolvido). Já estão aplicadas no projeto.
 
 Os hóspedes não leem as tabelas diretamente (RLS). Só usam estas funções:
 
