@@ -60,6 +60,6 @@ Depois de importar o In House ou o Arrivals, o Beach OPS chama `functions/v1/sin
   cd supabase/functions/sincronizar-quartos && curl -sS -X POST "https://api.supabase.com/v1/projects/ncisfqhfxqumoadikupm/functions/deploy?slug=sincronizar-quartos" \
     -F 'metadata={"entrypoint_path":"index.ts","name":"sincronizar-quartos","verify_jwt":false};type=application/json' -F "file=@index.ts;type=application/typescript"
   ```
-- **Site:** depois de mexer em `web/`, subir o `?v=` em `web/index.html`. Testar localmente com `cd web && python3 -m http.server 8765` e o Playwright (por exemplo iPhone 13, com um `timezoneId` diferente para apanhar erros de fuso). Apagar as reservas de teste no fim.
+- **Site:** depois de mexer em `web/`, subir a versão com `scripts/versao.sh <N+1>` (muda o `?v=` do `index.html` e de todos os imports entre módulos, que têm de ter todos o mesmo número; sem isso o browser pode usar módulos antigos da cache). Testar localmente com `cd web && python3 -m http.server 8765` e o Playwright (por exemplo iPhone 13, com um `timezoneId` diferente para apanhar erros de fuso). Apagar as reservas de teste no fim.
 - **Publicar:** um merge para `main` que mexa em `web/` publica sozinho no GitHub Pages (`.github/workflows/pages.yml`).
 - Desenvolver num ramo `claude/...` e abrir um PR para `main`. O utilizador prefere autonomia: perguntar só o que é mesmo decisão dele ou o que só a conta dele pode fazer.
