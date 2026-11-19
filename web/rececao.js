@@ -1,6 +1,6 @@
 // Painel da receção (#/rececao): login, grelha do dia, reservas/bloqueios, torneios, cacifos.
-import { planta, numeroBadge } from './planta.js?v=18';
-import { sb, $, $$, esc, autoAtualizar, normQuarto, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, carregarBase, erroTexto, toast, dialogo, confirmar, grelha, LOGO } from './core.js?v=18';
+import { planta, numeroBadge } from './planta.js?v=19';
+import { sb, $, $$, esc, autoAtualizar, normQuarto, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, carregarBase, erroTexto, toast, dialogo, confirmar, grelha, LOGO } from './core.js?v=19';
 
 let ultImport = null, B = null, dia = hoje(), aba = 'campos', selCampo = null, materialFora = [], itens = [], cacifos = [], usosAtivos = [], porPreparar = [], naoDevolvidos = [], torneios = [], app = null, staffNome = '';
 
@@ -68,9 +68,9 @@ async function recarregar(manter = false) {
   porPreparar = p.data.filter(x => !x.cacifo_usos.some(k => k.estado === 'preparado'));
   if (!manter) return desenhar();
   // atualização automática: manter a posição na página e na grelha
-  const w = $('.grelha-wrap'), y = scrollY, gt = w?.scrollTop, gl = w?.scrollLeft;
+  const w = $('.lt'), y = scrollY, gt = w?.scrollTop, gl = w?.scrollLeft;
   desenhar();
-  scrollTo(0, y); const w2 = $('.grelha-wrap'); if (w2 && w) { w2.scrollTop = gt; w2.scrollLeft = gl; }
+  scrollTo(0, y); const w2 = $('.lt'); if (w2 && w) { w2.scrollTop = gt; w2.scrollLeft = gl; }
 }
 const nomeEsp = id => B.espacos.find(e => e.id === id)?.nome || id;
 const usoAtivo = r => (r.cacifo_usos || []).find(u => u.estado === 'preparado');
@@ -115,13 +115,34 @@ function estadoCampo(e, agora = agoraD()) {
   return { cls: 'livre', txt: 'Livre', sub: prox ? `até ${hora(prox.inicio)}` : '', item: null };
 }
 const resumoMat = d => (d.itens || []).map(i => `${i.qtd}× ${i.nome}${(i.nums || []).length ? ' nº ' + i.nums.join(', ') : ''}`).join(' · ');
+// Material fora (cacifos e balcão) em post-its, como na app do Spa: atrasos primeiro
+const minutos = ms => { const m = Math.max(0, Math.round(ms / 60000)); return m >= 60 ? `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}` : `${m} min`; };
+function postits(agora) {
+  const t = agora.getTime(), fora = [];
+  usosAtivos.forEach(u => { const r = u.reservas; if (!r) return;
+    fora.push({ tipo: 'cacifo', id: u.id, quarto: r.quarto, ate: new Date(r.fim).getTime(), desde: new Date(r.inicio).getTime(),
+      linhas: [esc(u.material || 'Material no cacifo')], meta: `${esc(nomeEsp(r.espaco_id))} · cacifo ${u.cacifo_id} · código ${esc(u.codigo)}` }); });
+  materialFora.forEach(x => { const d = x.doc;
+    fora.push({ tipo: 'balcao', id: x.id, quarto: d.quarto, ate: d.prevista, desde: d.saida,
+      linhas: (d.itens || []).map(i => `<b>${i.qtd}×</b> ${esc(i.nome)}${(i.nums || []).length ? ` <span class="nb">${i.nums.map(n => `<span>${n}</span>`).join('')}</span>` : ''}`),
+      meta: `Balcão · saiu ${hora(d.saida)}${d.colabEntregou ? ' · ' + esc(d.colabEntregou.split(' ')[0]) : ''}` }); });
+  if (!fora.length) return '';
+  const sev = f => !f.ate ? 'ok' : t > f.ate ? 'bad' : f.ate - t < 30 * 60e3 ? 'warn' : 'ok';
+  const ordem = { bad: 0, warn: 1, ok: 2 };
+  fora.sort((a, b) => ordem[sev(a)] - ordem[sev(b)] || (a.ate || 0) - (b.ate || 0));
+  const nAtr = fora.filter(f => sev(f) === 'bad').length;
+  return `<section class="card stack"><div class="row between"><h2>Material fora</h2><span class="row"><span class="chip">${fora.length} registo${fora.length > 1 ? 's' : ''}</span>${nAtr ? `<span class="chip est-atraso">${nAtr} em atraso</span>` : ''}</span></div>
+    <div class="postits">${fora.map(f => { const s = sev(f);
+      const pill = s === 'bad' ? `Atraso ${minutos(t - f.ate)}` : s === 'warn' ? `Faltam ${minutos(f.ate - t)}` : f.ate ? `Até ${hora(f.ate)}` : '';
+      return `<article class="postit ${s}"><div class="r1"><span class="room">${esc(f.quarto)}</span>${pill ? `<span class="pill ${s}">${pill}</span>` : ''}</div>
+        <div class="mat">${f.linhas.map(l => `<div>${l}</div>`).join('')}</div><div class="meta">${f.meta}</div>
+        <div class="acts">${f.tipo === 'cacifo' ? `<button class="btn small" data-dev-cac="${f.id}">Devolvido</button><button class="btn ghost danger small" data-nd-cac="${f.id}">Não devolvido</button>` : '<a class="btn small" href="material/">Devolver no balcão</a>'}</div></article>`; }).join('')}</div></section>`;
+}
 function vCampos() {
   const agora = agoraD(), sel = B.espacos.find(e => e.id === selCampo);
   const est = B.espacos.map(e => estadoCampo(e, agora));
   const n = k => est.filter(x => x.cls === k).length;
   const seguir = itens.filter(r => new Date(r.inicio) > agora && new Date(r.inicio) - agora <= 2 * 3600e3).sort((a, b) => new Date(a.inicio) - new Date(b.inicio));
-  const atrasoMat = materialFora.filter(x => x.doc.prevista && x.doc.prevista < agora.getTime()).sort((a, b) => a.doc.prevista - b.doc.prevista);
-  const atrasoCac = B.espacos.map((e, i) => est[i].cls === 'atraso' ? { e, r: est[i].item } : null).filter(Boolean);
   let lado = '';
   if (sel) {
     const st = estadoCampo(sel, agora), its = itens.filter(r => r.espaco_id === sel.id).sort((a, b) => new Date(a.inicio) - new Date(b.inicio));
@@ -135,12 +156,7 @@ function vCampos() {
   }
   lado += `<section class="card stack"><h2>A seguir <span class="muted small">· próximas 2 h</span></h2>
     ${seguir.length ? `<ul class="lista">${seguir.map(r => `<li><span><b>${hora(r.inicio)}</b> ${esc(nomeEsp(r.espaco_id))} · ${esc(rotulo(r))}${r.tipo === 'reserva' && r.precisa_material && !usoAtivo(r) ? ' <span class="chip warn">preparar material</span>' : ''}</span><button class="btn ghost small" data-item="${r.id}">Abrir</button></li>`).join('')}</ul>` : '<p class="muted" style="margin:0">Nada nas próximas 2 horas.</p>'}</section>`;
-  if (atrasoCac.length || atrasoMat.length) {
-    lado += `<section class="card stack aviso-mat"><h2>Material por devolver</h2><ul class="lista">
-      ${atrasoCac.map(({ e, r }) => `<li><span><b>${esc(r.quarto)}</b> · ${esc(e.nome)} · cacifo ${usoAtivo(r).cacifo_id} · acabou às ${hora(r.fim)}</span><button class="btn ghost small" data-item="${r.id}">Abrir</button></li>`).join('')}
-      ${atrasoMat.map(x => `<li><span><b>${esc(x.doc.quarto)}</b> · ${esc(resumoMat(x.doc))} · devia devolver às ${hora(x.doc.prevista)}</span><a class="btn ghost small" href="material/">Balcão</a></li>`).join('')}
-    </ul></section>`;
-  }
+  lado += postits(agora);
   return `<div class="campos-vista"><div class="campos-planta">${planta(B.espacos, e => estadoCampo(e, agora), selCampo)}
     <div class="legenda small"><span><i class="lg livre"></i>Livre</span><span><i class="lg uso"></i>Em uso</span><span><i class="lg tor"></i>Torneio</span><span><i class="lg blq"></i>Bloqueado</span><span><i class="lg atraso"></i>Material por devolver</span></div></div>
     <div class="campos-lado stack">${lado}</div></div>`;
@@ -149,6 +165,12 @@ function ligarCampos() {
   $$('[data-campo]').forEach(b => b.onclick = () => { selCampo = selCampo === b.dataset.campo ? null : b.dataset.campo; desenhar(); });
   $$('.campos-lado [data-item]').forEach(b => b.onclick = () => detalhe(itens.find(r => r.id === b.dataset.item)));
   const f = $('[data-fechar-campo]'); if (f) f.onclick = () => { selCampo = null; desenhar(); };
+  $$('[data-dev-cac]').forEach(b => b.onclick = async () => {
+    const { error } = await sb.from('cacifo_usos').update({ estado: 'devolvido', devolvido_em: new Date().toISOString() }).eq('id', b.dataset.devCac);
+    if (error) { toast(erroTexto(error), 'erro'); return; }
+    toast('Material devolvido. Mude o código do cacifo.'); recarregar();
+  });
+  $$('[data-nd-cac]').forEach(b => b.onclick = () => { const u = usosAtivos.find(x => x.id === b.dataset.ndCac); if (u) naoDevolvido(u, u.reservas); });
   const nv = $('[data-novo]');
   if (nv) nv.onclick = () => {
     const e = B.espacos.find(x => x.id === nv.dataset.novo), agoraMin = Math.floor((Date.now() - lisboa(hoje(), 0).getTime()) / 60000);
@@ -165,17 +187,46 @@ function vGrelha() {
       <input type="date" id="g-dia" value="${dia}" aria-label="Dia"><h2 class="cap">${esc(dataLonga(dia))}</h2></div>
       <div class="row"><span class="muted small">${n} reserva${n === 1 ? '' : 's'}</span><button class="btn small" id="b-novo">+ Reserva / bloqueio</button><button class="btn ghost small" id="b-rec">Atualizar</button></div>
     </div>
-    <p class="small muted" style="margin:0">${ultImport ? `Lista de hóspedes (Beach OPS): ${ultImport.quartos} estadias, importada ${esc(dataCurta(diaDe(ultImport.em)))} às ${hora(ultImport.em)}${ultImport.por ? ' por ' + esc(ultImport.por) : ''}. ` : 'Lista de hóspedes ainda não importada no Beach OPS: os quartos não são validados. '}Toque num espaço livre para reservar ou bloquear; toque numa reserva para ver detalhes, cancelar ou preparar cacifo.</p>
-    ${grelha({ espacos: B.espacos, dia, itens: itens.map(r => ({ ...r, label: rotulo(r), extra: esc(extra(r)) })), clicavel: true })}`;
+    <p class="small muted" style="margin:0">${ultImport ? `Lista de hóspedes (Beach OPS): ${ultImport.quartos} estadias, importada ${esc(dataCurta(diaDe(ultImport.em)))} às ${hora(ultImport.em)}${ultImport.por ? ' por ' + esc(ultImport.por) : ''}. ` : 'Lista de hóspedes ainda não importada no Beach OPS: os quartos não são validados. '}Toque num espaço vazio de um campo para reservar ou bloquear; toque numa marcação para ver detalhes, cancelar ou preparar cacifo.</p>
+    ${linhaTempo()}`;
 }
 function ligarGrelha() {
   $$('[data-dia]').forEach(b => b.onclick = () => { const d = +b.dataset.dia; dia = d === 0 ? hoje() : addDias(dia, d); recarregar(); });
   $('#g-dia').onchange = e => { if (e.target.value) { dia = e.target.value; recarregar(); } };
   $('#b-rec').onclick = recarregar;
   $('#b-novo').onclick = () => novo(B.espacos[0].id, null);
-  const ativar = (sel, fn) => $$(sel).forEach(td => { td.onclick = () => fn(td); td.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn(td); } }; });
-  ativar('[data-livre]', td => novo(td.dataset.livre, +td.dataset.min));
-  ativar('[data-item]', td => detalhe(itens.find(r => r.id === td.dataset.item)));
+  $$('.lt [data-item]').forEach(b => b.onclick = ev => { ev.stopPropagation(); detalhe(itens.find(r => r.id === b.dataset.item)); });
+  // tocar num espaço vazio da pista: nova marcação nesse campo, à meia hora tocada
+  $$('.lt-pista').forEach(p => p.onclick = ev => {
+    if (ev.target.closest('[data-item]')) return;
+    const e = B.espacos.find(x => x.id === p.dataset.pista), r = p.getBoundingClientRect();
+    const { ini, fim } = limitesDia(), m = ini + (ev.clientX - r.left) / r.width * (fim - ini);
+    novo(e.id, Math.min(e.fechaMin - e.passo_min, Math.max(e.abreMin, Math.floor(m / e.passo_min) * e.passo_min)));
+  });
+}
+const limitesDia = () => ({ ini: Math.min(...B.espacos.map(e => e.abreMin)), fim: Math.max(...B.espacos.map(e => e.fechaMin)) });
+// Dia inteiro em linha do tempo: uma pista por campo, blocos com as marcações, linha vermelha na hora atual
+function linhaTempo() {
+  const { ini, fim } = limitesDia(), tot = fim - ini, base = lisboa(dia, 0).getTime();
+  const pos = t => Math.max(0, Math.min(100, ((t - base) / 60000 - ini) / tot * 100));
+  const agoraP = dia === hoje() ? pos(Date.now()) : dia < hoje() ? 100 : 0;
+  const horas = []; for (let m = ini; m < fim; m += 60) horas.push(m);
+  let h = `<div class="lt" role="region" aria-label="Marcações do dia por campo"><div class="lt-linha lt-horas"><span class="lt-nome"></span><div class="lt-pista">${horas.map(m => `<span style="left:${((m - ini) / tot * 100).toFixed(3)}%">${String(m / 60).padStart(2, '0')}</span>`).join('')}</div></div>`;
+  for (const e of B.espacos) {
+    const its = itens.filter(r => r.espaco_id === e.id);
+    h += `<div class="lt-linha"><span class="lt-nome">${numeroBadge(e)}<span>${esc(e.nome)}</span></span><div class="lt-pista" data-pista="${esc(e.id)}" title="Toque num espaço livre para marcar">`;
+    for (let m = ini; m < fim; m += 60) h += `<i class="lt-h" style="left:${((m - ini) / tot * 100).toFixed(3)}%"></i>`;
+    if (e.abreMin > ini) h += `<i class="lt-fora" style="left:0;width:${((e.abreMin - ini) / tot * 100).toFixed(3)}%"></i>`;
+    if (e.fechaMin < fim) h += `<i class="lt-fora" style="left:${((e.fechaMin - ini) / tot * 100).toFixed(3)}%;right:0"></i>`;
+    if (agoraP > 0) h += `<i class="lt-passado" style="width:${agoraP.toFixed(3)}%"></i>`;
+    for (const r of its) {
+      const a = pos(new Date(r.inicio).getTime()), b = pos(new Date(r.fim).getTime()), x = extra(r);
+      h += `<button type="button" class="lt-b t-${r.tipo}${usoAtivo(r) && new Date(r.fim) <= Date.now() ? ' atraso' : ''}" data-item="${r.id}" style="left:${a.toFixed(3)}%;width:${(b - a).toFixed(3)}%" title="${esc(`${hora(r.inicio)}–${hora(r.fim)} · ${rotulo(r)}${x ? ' · ' + x : ''}`)}"><b>${esc(rotulo(r))}</b><small>${hora(r.inicio)}–${hora(r.fim)}${x ? ' · ' + esc(x) : ''}</small></button>`;
+    }
+    if (dia === hoje() && agoraP > 0 && agoraP < 100) h += `<i class="lt-agora" style="left:${agoraP.toFixed(3)}%"></i>`;
+    h += '</div></div>';
+  }
+  return h + `</div><div class="legenda small"><span><i class="lg uso"></i>Reserva</span><span><i class="lg tor"></i>Torneio</span><span><i class="lg blq"></i>Bloqueio</span><span><i class="lg atraso"></i>Material por devolver</span><span><i class="lt-agora-lg"></i>Agora</span></div>`;
 }
 
 /* ---------- nova reserva / bloqueio ---------- */
