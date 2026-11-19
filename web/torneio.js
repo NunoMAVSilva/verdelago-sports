@@ -312,16 +312,19 @@ function vInscricoes() {
 function vSemPar() {
   const ps = T.individuais, val = ps.filter(p => p.validado).length, falta = ps.length - val;
   const temNivel = ps.filter(p => p.nivel).length >= ps.length / 2; // sorteio, a não ser que a maioria tenha nível
+  const nF = ps.filter(p => p.sexo === 'F').length, nM = ps.filter(p => p.sexo === 'M').length;
+  const misto = nF > 0 && nM > 0 && nF + nM === ps.length; // todos com F/M e há dos dois: sugerir duplas mistas
   const pode = ps.length >= 2 && !falta;
+  const optS = p => `<select data-sexo="${p.id}" aria-label="${esc(p.nome)}: F ou M" style="min-height:36px"><option value="">F/M</option><option value="F" ${p.sexo === 'F' ? 'selected' : ''}>F</option><option value="M" ${p.sexo === 'M' ? 'selected' : ''}>M</option></select>`;
   const optN = p => `<select data-nivel="${p.id}" aria-label="Nível de ${esc(p.nome)}" style="min-height:36px"><option value="">Nível —</option>${[1, 2, 3, 4, 5, 6].map(n => `<option value="${n}" ${+p.nivel === n ? 'selected' : ''}>Nível ${n}</option>`).join('')}</select>`;
   return `<section class="card stack"><div class="row between"><h2>Inscrições individuais (${ps.length})</h2>
     ${ps.length ? `<span class="chip ${falta ? 'warn' : 'ok'}">${falta ? `${val} de ${ps.length} validadas` : 'Todas validadas'}</span>` : ''}</div>
-    ${ps.length ? `<p class="small muted" style="margin:0">Confirme cada inscrição (o jogador está presente e quer jogar) e, se souber, o nível. Quem não vier, remova com ×. Quando todas estiverem validadas, gere as duplas.</p>
+    ${ps.length ? `<p class="small muted" style="margin:0">Confirme cada inscrição (o jogador está presente e quer jogar), indique F/M para as duplas mistas e, se souber, o nível.${nF + nM ? ` ${nF} F · ${nM} M.` : ''} Quem não vier, remova com ×. Quando todas estiverem validadas, gere as duplas.</p>
     <ul class="lista">${ps.map((p, i) => `<li><label class="row nowrap" style="gap:10px;cursor:pointer;flex:1;min-width:0"><input type="checkbox" data-valida="${p.id}" ${p.validado ? 'checked' : ''} style="width:22px;height:22px;accent-color:var(--accent);flex:none"><span class="num">${i + 1}</span><span style="min-width:0">${esc(p.nome)}${p.tel ? ` <span class="muted small">· ${esc(p.tel)}</span>` : ''}</span></label>
-      <span class="row nowrap">${optN(p)}<button class="x" data-act="delInd" data-id="${p.id}" aria-label="Remover ${esc(p.nome)}">×</button></span></li>`).join('')}</ul>
+      <span class="row nowrap">${optS(p)}${optN(p)}<button class="x" data-act="delInd" data-id="${p.id}" aria-label="Remover ${esc(p.nome)}">×</button></span></li>`).join('')}</ul>
     <div class="row between">
       <button class="btn ghost small" data-act="validarTodas" ${falta ? '' : 'disabled'}>Validar todas</button>
-      <div class="row"><select id="modo-formar" aria-label="Como formar duplas"><option value="sorteio" ${temNivel ? '' : 'selected'}>Sorteio</option><option value="equilibrado" ${temNivel ? 'selected' : ''}>Equilibradas por nível (forte + menos forte)</option><option value="semelhante">Nível semelhante</option></select>
+      <div class="row"><select id="modo-formar" aria-label="Como formar duplas"><option value="misto" ${misto ? 'selected' : ''}>Mistas: uma rapariga + um rapaz</option><option value="sorteio" ${!misto && !temNivel ? 'selected' : ''}>Sorteio</option><option value="equilibrado" ${!misto && temNivel ? 'selected' : ''}>Equilibradas por nível (forte + menos forte)</option><option value="semelhante">Nível semelhante</option></select>
       <button class="btn" data-act="formar" ${pode ? '' : 'disabled'}>Gerar duplas</button></div>
     </div>
     ${!pode ? `<p class="small muted" style="margin:0;text-align:right">${ps.length < 2 ? 'São precisos pelo menos 2 jogadores.' : `Falta${falta > 1 ? 'm' : ''} validar ${falta} inscriç${falta > 1 ? 'ões' : 'ão'}.`}</p>` : ps.length % 2 ? '<p class="small muted" style="margin:0;text-align:right">Número ímpar: 1 jogador fica à espera de par.</p>' : ''}`
@@ -449,10 +452,21 @@ const ACTS = {
   },
   formar() {
     if (T.individuais.some(p => !p.validado)) { toast('Valide primeiro todas as inscrições.'); return; }
-    const modo = $('#modo-formar').value; const ps = [...T.individuais];
-    if (modo === 'sorteio') baralhar(ps); else ps.sort((a, b) => (a.nivel || 4) - (b.nivel || 4));
+    const modo = $('#modo-formar').value; let ps = [...T.individuais];
     const pares = [];
-    if (modo === 'equilibrado') while (ps.length >= 2) pares.push([ps.shift(), ps.pop()]); else while (ps.length >= 2) pares.push([ps.shift(), ps.shift()]);
+    if (modo === 'misto') {
+      if (ps.some(p => !p.sexo)) { toast('Para duplas mistas, indique F ou M em todos os jogadores.'); return; }
+      // raparigas e rapazes sorteados à parte; com níveis, a mais forte joga com o menos forte
+      const porNivel = ps.some(p => p.nivel);
+      const fs = baralhar(ps.filter(p => p.sexo === 'F')), ms = baralhar(ps.filter(p => p.sexo === 'M'));
+      if (porNivel) { fs.sort((a, b) => (a.nivel || 4) - (b.nivel || 4)); ms.sort((a, b) => (b.nivel || 4) - (a.nivel || 4)); }
+      while (fs.length && ms.length) pares.push([fs.shift(), ms.shift()]);
+      ps = baralhar([...fs, ...ms]); // quem sobra joga com alguém do mesmo grupo
+      while (ps.length >= 2) pares.push([ps.shift(), ps.shift()]);
+    } else {
+      if (modo === 'sorteio') baralhar(ps); else ps.sort((a, b) => (a.nivel || 4) - (b.nivel || 4));
+      if (modo === 'equilibrado') while (ps.length >= 2) pares.push([ps.shift(), ps.pop()]); else while (ps.length >= 2) pares.push([ps.shift(), ps.shift()]);
+    }
     pares.forEach(([a, b]) => T.duplas.push({ id: uid(), j1: a.nome, j2: b.nome, n1: a.nivel, n2: b.nivel, tel: [a.tel, b.tel].filter(Boolean).join(' / '), formada: true, origem: [a, b] }));
     T.individuais = ps; toast(`${pares.length} dupla${pares.length !== 1 ? 's' : ''} formada${pares.length !== 1 ? 's' : ''}.${ps.length ? ' Fica 1 jogador à espera de par.' : ''}`); commit();
   },
@@ -508,6 +522,7 @@ document.addEventListener('change', e => {
   const el = e.target;
   if (el.id === 'mostrar-feitos') { mostrarFeitos = el.checked; render(); return; }
   if (el.dataset.valida) { const p = T.individuais.find(x => x.id === el.dataset.valida); if (p) { p.validado = el.checked; commit(); } return; }
+  if (el.dataset.sexo) { const p = T.individuais.find(x => x.id === el.dataset.sexo); if (p) { p.sexo = el.value || null; commit(); } return; }
   if (el.dataset.nivel) { const p = T.individuais.find(x => x.id === el.dataset.nivel); if (p) { p.nivel = +el.value || null; commit(); } return; }
   const k = el.dataset.cfg; if (!k) return;
   if (k.startsWith('pts.')) T.pts[k.slice(4)] = +el.value || 0;
