@@ -6,7 +6,7 @@ Base de dados: **Supabase** (`https://ncisfqhfxqumoadikupm.supabase.co`).
 
 ## Espaços
 
-8 campos de pádel, 2 de ténis, futebol 7, beach volley e polidesportivo. Todos das 08:00 às 22:00, em **intervalos de 30 min**; o hóspede escolhe a duração (30 a 120 min). Editável na tabela `espacos` (`abre`, `fecha`, `passo_min`, `max_duracao_min`).
+8 campos de pádel, 2 de ténis, futebol 7, beach volley e polidesportivo, com a numeração da sinalética: 1 Polidesportivo, 2–3 Ténis, 4 Beach Volley, 5–12 Pádel, 15 Futebol 7. Todos das 08:00 às 22:00, em **intervalos de 30 min**; o hóspede escolhe a duração (30 a 120 min). Editável na tabela `espacos` (`abre`, `fecha`, `passo_min`, `max_duracao_min`).
 
 ## Como funciona
 
@@ -31,7 +31,7 @@ Fechaduras de combinação reprogramável. A receção põe o material, define u
 
 ## Base de dados
 
-`supabase/migrations/`: aplicadas por ordem (0001 esquema inicial, 0002 slots de 30 min, 0003 estadias e validação do quarto, 0004 torneios a bloquear campos, 0005 app dos torneios, 0006 Realtime, 0007 emails, 0008 material não devolvido, 0009 material desportivo). Já estão aplicadas no projeto.
+`supabase/migrations/`: aplicadas por ordem (0001 esquema inicial, 0002 slots de 30 min, 0003 estadias e validação do quarto, 0004 torneios a bloquear campos, 0005 app dos torneios, 0006 Realtime, 0007 emails, 0008 material não devolvido, 0009 material desportivo, 0010 numeração da sinalética). Já estão aplicadas no projeto.
 
 Os hóspedes não leem as tabelas diretamente (RLS). Só usam estas funções:
 
@@ -93,7 +93,7 @@ Site estático (HTML + JS, sem build). Uma só página com rotas:
 |---|---|
 | `#/` | Reservar (hóspedes, PT/EN, pensado para telemóvel) |
 | `#/r/<token>` | A reserva do hóspede: detalhes, cacifo e código, cancelar |
-| `#/rececao` | Painel da receção (login; atualiza sozinho via Supabase Realtime e de 30 em 30 s): grelha do dia, reservas e bloqueios, cacifos e material por preparar, mensagem para o hóspede por WhatsApp/email |
+| `#/rececao` | Painel da receção (login). Primeiro separador **Campos**: planta do Sports Center com o estado de cada campo agora, o dia do campo tocado, o que vem a seguir e o material por devolver. ( atualiza sozinho via Supabase Realtime e de 30 em 30 s): grelha do dia, reservas e bloqueios, cacifos e material por preparar, mensagem para o hóspede por WhatsApp/email |
 | `#/torneio/<id>` | Gerir um torneio (staff): inscrições, grupos, jogos, eliminatórias |
 | `#/tv` | Ecrã TV: ocupação do dia, atualiza de 20 em 20 s |
 | `#/tv/torneio` | Ecrã TV do torneio do dia: ronda a decorrer, classificação/quadro e a seguir, em ecrãs que rodam a cada 20 s (dados a cada 5 s) |
