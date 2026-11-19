@@ -2,7 +2,7 @@
 // Vem da app "Torneios de Pádel Verdelago" (artefacto). O estado fica em torneios.dados;
 // nome, dias, hora de início e campos são os do torneio (que bloqueia os campos na grelha).
 // #/torneio/<id> (staff) · #/tv/torneio[/<id>] (público, via torneio_tv)
-import { sb, $, esc, hora, dataLonga, carregarBase, erroTexto, toast, confirmar, LOGO } from './core.js';
+import { sb, $, esc, hora, dataLonga, carregarBase, erroTexto, toast, confirmar, LOGO } from './core.js?v=16';
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const LETRAS = 'ABCDEFGHIJKLMNOP';
@@ -368,6 +368,7 @@ function vGrupos() {
     <div class="prev" id="prev-grupos">${prevGrupos(n)}</div>
     <p class="small muted" style="margin:0">Sugestão: grupos de 4 (${sug} para ${N} duplas). Todos jogam contra todos no grupo; o calendário evita que uma dupla jogue duas rondas seguidas sempre que possível.</p>
   </section>
+  ${T.grupos.length ? destaqueFolgas() : ''}
   ${T.grupos.length ? `<p class="small muted" style="margin:0">A barra verde marca quem está, neste momento, nos lugares de apuramento para um quadro de ${tamanhoQuadro(T)}.</p>
   <div class="grid2">${T.grupos.map(g => `<section class="card gcard stack"><h3>Grupo ${g.id}<span class="small muted">${T.jogos.filter(m => m.grupo === g.id && jogado(m)).length}/${T.jogos.filter(m => m.grupo === g.id).length} jogos</span></h3>${tabela(g, quals)}</section>`).join('')}</div>` : vazio('Ainda não há grupos.')}`;
 }
@@ -390,12 +391,23 @@ function cardJogo(m) {
     ${empate && A && Bq ? `<div class="desempate"><span>Empatado no fim do tempo. Quem ganhou o ponto decisivo?</span><div class="row"><button class="btn small ${m.desempate === 'a' ? 'on' : 'ghost'}" data-act="desempate" data-id="${m.id}" data-lado="a">${esc(dupla(T, A).j1)}…</button><button class="btn small ${m.desempate === 'b' ? 'on' : 'ghost'}" data-act="desempate" data-id="${m.id}" data-lado="b">${esc(dupla(T, Bq).j1)}…</button></div></div>` : ''}
   </article>`;
 }
+const nomesFolga = s => folgas(T, s).map(id => `<b>${esc(nomeD(T, id))}</b>`).join(' · ');
+function destaqueFolgas() {
+  const s = slotAtual(); if (s == null) return '';
+  const p = proxSlot(s), lin = [];
+  const titulo = x => { const m = T.jogos.find(j => j.slot === x); return m && m.fase === 'ko' ? (NOME_RONDA[m.nm] || 'Eliminatória') : 'Ronda ' + (x + 1); };
+  const f1 = nomesFolga(s), f2 = p != null ? nomesFolga(p) : '';
+  if (f1) lin.push(`<div><span class="muted">${titulo(s)} (agora) · folga${folgas(T, s).length > 1 ? 'm' : ''}:</span> ${f1}</div>`);
+  if (f2) lin.push(`<div><span class="muted">${titulo(p)} (a seguir) · folga${folgas(T, p).length > 1 ? 'm' : ''}:</span> ${f2}</div>`);
+  return lin.length ? `<div class="folga-box">${lin.join('')}</div>` : '';
+}
 function vJogos() {
   const ms = T.jogos.filter(m => m.slot != null);
   if (!ms.length) return vazio('Ainda não há jogos. Gere os grupos no separador Grupos.');
   const slots = [...new Set(ms.map(m => m.slot))].sort((a, b) => a - b);
   const feitos = ms.filter(jogado).length;
   let html = `<div class="row between"><h2>Calendário · ${feitos}/${ms.length} jogos</h2><label class="row small" for="mostrar-feitos"><input type="checkbox" id="mostrar-feitos" ${mostrarFeitos ? 'checked' : ''}> Mostrar rondas terminadas</label></div>`;
+  html += destaqueFolgas();
   let escondidas = 0;
   for (const s of slots) {
     const js = ms.filter(m => m.slot === s).sort(porCampo);
@@ -403,7 +415,7 @@ function vJogos() {
     const ko = js[0].fase === 'ko';
     html += `<section><div class="slothead"><h3>${ko ? esc(NOME_RONDA[js[0].nm] || 'Eliminatória') : 'Ronda ' + (s + 1)}<span>${horaSlot(T, s)}</span></h3>
       ${relogioAtivo(s) ? '<span class="row"><b class="crono-grande" data-crono></b><button class="btn small on" data-act="pararRelogio">Parar cronómetro</button></span>' : `<button class="btn small ghost" data-act="relogio" data-slot="${s}">Iniciar cronómetro (${T.duracao} min)</button>`}</div>
-      ${(f => f.length ? `<p class="small" style="margin:-4px 0 10px"><b>Folga${f.length > 1 ? 'm' : ''}:</b> ${f.map(id => esc(nomeD(T, id))).join(' · ')}</p>` : '')(folgas(T, s))}
+      ${(f => f.length ? `<p class="folga"><span>Folga${f.length > 1 ? 'm' : ''}:</span> ${f.map(id => `<b>${esc(nomeD(T, id))}</b>`).join(' · ')}</p>` : '')(folgas(T, s))}
       <div class="jogos">${js.map(cardJogo).join('')}</div></section>`;
   }
   if (escondidas) html += `<p class="small muted">${escondidas} ronda${escondidas > 1 ? 's' : ''} terminada${escondidas > 1 ? 's' : ''} escondida${escondidas > 1 ? 's' : ''}.</p>`;
@@ -435,7 +447,7 @@ function vQuadro() {
 /* ---------- ações (staff) ---------- */
 const ACTS = {
   async editarBloq() {
-    const { editarTorneio } = await import('./rececao.js');
+    const { editarTorneio } = await import('./rececao.js?v=16');
     editarTorneio(R, B, async () => { if (await carregar(R.id)) render(); });
   },
   async estenderBloq() {

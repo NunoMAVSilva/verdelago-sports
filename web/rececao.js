@@ -1,5 +1,5 @@
 // Painel da receção (#/rececao): login, grelha do dia, reservas/bloqueios, torneios, cacifos.
-import { sb, $, $$, esc, autoAtualizar, normQuarto, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, carregarBase, erroTexto, toast, dialogo, confirmar, grelha, LOGO } from './core.js';
+import { sb, $, $$, esc, autoAtualizar, normQuarto, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, carregarBase, erroTexto, toast, dialogo, confirmar, grelha, LOGO } from './core.js?v=16';
 
 let ultImport = null, B = null, dia = hoje(), aba = 'grelha', itens = [], cacifos = [], usosAtivos = [], porPreparar = [], naoDevolvidos = [], torneios = [], app = null, staffNome = '';
 
