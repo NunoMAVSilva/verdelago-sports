@@ -302,12 +302,30 @@ function vInscricoes() {
     </div><div class="row end"><button class="btn">Inscrever jogador</button></div>
   </form></div>
   <p class="small muted" style="margin:0">Nível de 1 (mais forte) a 6, como nos escalões M1–M6 / F1–F6. Serve para equilibrar duplas e grupos. Os contactos só são vistos pela receção.</p>
-  <section class="card stack"><div class="row between"><h2>Jogadores sem par (${T.individuais.length})</h2>
-    <div class="row"><select id="modo-formar" aria-label="Como formar duplas"><option value="equilibrado">Equilibradas (forte + menos forte)</option><option value="semelhante">Nível semelhante</option><option value="sorteio">Sorteio</option></select><button class="btn small" data-act="formar" ${T.individuais.length < 2 ? 'disabled' : ''}>Formar duplas</button></div></div>
-    ${T.individuais.length ? `<ul class="lista">${T.individuais.map((p, i) => `<li><span><span class="num">${i + 1}</span>${esc(p.nome)}${nv(p.nivel)}${p.tel ? ` <span class="muted small">· ${esc(p.tel)}</span>` : ''}</span><button class="x" data-act="delInd" data-id="${p.id}" aria-label="Remover ${esc(p.nome)}">×</button></li>`).join('')}</ul>` : '<p class="muted">Ninguém à espera de par.</p>'}
-  </section>
-  <section class="card stack"><h2>Duplas inscritas (${T.duplas.length})</h2>
+  ${vSemPar()}
+  <section class="card stack"><div class="row between"><h2>Duplas inscritas (${T.duplas.length})</h2>${T.duplas.some(d => d.formada) ? '<button class="btn ghost small" data-act="desfazer">Desfazer duplas formadas</button>' : ''}</div>
     ${T.duplas.length ? `<ul class="lista">${T.duplas.map((d, i) => `<li><span><span class="num">${i + 1}</span>${esc(d.j1)}${nv(d.n1)} / ${esc(d.j2)}${nv(d.n2)}${d.formada ? ' <span class="chip">formada</span>' : ''}${d.tel ? ` <span class="muted small">· ${esc(d.tel)}</span>` : ''}</span><button class="x" data-act="delDupla" data-id="${d.id}" aria-label="Remover dupla">×</button></li>`).join('')}</ul>` : '<p class="muted">Ainda não há duplas.</p>'}
+  </section>`;
+}
+
+// Inscrições individuais: validar cada jogador (presença, nível) e só depois gerar as duplas.
+function vSemPar() {
+  const ps = T.individuais, val = ps.filter(p => p.validado).length, falta = ps.length - val;
+  const temNivel = ps.filter(p => p.nivel).length >= ps.length / 2; // sorteio, a não ser que a maioria tenha nível
+  const pode = ps.length >= 2 && !falta;
+  const optN = p => `<select data-nivel="${p.id}" aria-label="Nível de ${esc(p.nome)}" style="min-height:36px"><option value="">Nível —</option>${[1, 2, 3, 4, 5, 6].map(n => `<option value="${n}" ${+p.nivel === n ? 'selected' : ''}>Nível ${n}</option>`).join('')}</select>`;
+  return `<section class="card stack"><div class="row between"><h2>Inscrições individuais (${ps.length})</h2>
+    ${ps.length ? `<span class="chip ${falta ? 'warn' : 'ok'}">${falta ? `${val} de ${ps.length} validadas` : 'Todas validadas'}</span>` : ''}</div>
+    ${ps.length ? `<p class="small muted" style="margin:0">Confirme cada inscrição (o jogador está presente e quer jogar) e, se souber, o nível. Quem não vier, remova com ×. Quando todas estiverem validadas, gere as duplas.</p>
+    <ul class="lista">${ps.map((p, i) => `<li><label class="row nowrap" style="gap:10px;cursor:pointer;flex:1;min-width:0"><input type="checkbox" data-valida="${p.id}" ${p.validado ? 'checked' : ''} style="width:22px;height:22px;accent-color:var(--accent);flex:none"><span class="num">${i + 1}</span><span style="min-width:0">${esc(p.nome)}${p.tel ? ` <span class="muted small">· ${esc(p.tel)}</span>` : ''}</span></label>
+      <span class="row nowrap">${optN(p)}<button class="x" data-act="delInd" data-id="${p.id}" aria-label="Remover ${esc(p.nome)}">×</button></span></li>`).join('')}</ul>
+    <div class="row between">
+      <button class="btn ghost small" data-act="validarTodas" ${falta ? '' : 'disabled'}>Validar todas</button>
+      <div class="row"><select id="modo-formar" aria-label="Como formar duplas"><option value="sorteio" ${temNivel ? '' : 'selected'}>Sorteio</option><option value="equilibrado" ${temNivel ? 'selected' : ''}>Equilibradas por nível (forte + menos forte)</option><option value="semelhante">Nível semelhante</option></select>
+      <button class="btn" data-act="formar" ${pode ? '' : 'disabled'}>Gerar duplas</button></div>
+    </div>
+    ${!pode ? `<p class="small muted" style="margin:0;text-align:right">${ps.length < 2 ? 'São precisos pelo menos 2 jogadores.' : `Falta${falta > 1 ? 'm' : ''} validar ${falta} inscriç${falta > 1 ? 'ões' : 'ão'}.`}</p>` : ps.length % 2 ? '<p class="small muted" style="margin:0;text-align:right">Número ímpar: 1 jogador fica à espera de par.</p>' : ''}`
+    : '<p class="muted">Ninguém à espera de par.</p>'}
   </section>`;
 }
 
@@ -418,7 +436,7 @@ const ACTS = {
   },
   addInd(f) {
     const e = f.elements, nome = e.nome.value.trim(); if (!nome) { toast('Indique o nome do jogador.'); return; }
-    T.individuais.push({ id: uid(), nome, nivel: +e.nivel.value || null, tel: e.tel.value.trim() }); commit(); setTimeout(() => $('#i-nome')?.focus(), 0);
+    T.individuais.push({ id: uid(), nome, nivel: +e.nivel.value || null, tel: e.tel.value.trim(), validado: false }); commit(); setTimeout(() => $('#i-nome')?.focus(), 0);
   },
   delInd(b) { T.individuais = T.individuais.filter(p => p.id !== b.dataset.id); commit(); },
   async delDupla(b) {
@@ -430,12 +448,24 @@ const ACTS = {
     T.duplas = T.duplas.filter(d => d.id !== id); commit();
   },
   formar() {
+    if (T.individuais.some(p => !p.validado)) { toast('Valide primeiro todas as inscrições.'); return; }
     const modo = $('#modo-formar').value; const ps = [...T.individuais];
     if (modo === 'sorteio') baralhar(ps); else ps.sort((a, b) => (a.nivel || 4) - (b.nivel || 4));
     const pares = [];
     if (modo === 'equilibrado') while (ps.length >= 2) pares.push([ps.shift(), ps.pop()]); else while (ps.length >= 2) pares.push([ps.shift(), ps.shift()]);
-    pares.forEach(([a, b]) => T.duplas.push({ id: uid(), j1: a.nome, j2: b.nome, n1: a.nivel, n2: b.nivel, tel: [a.tel, b.tel].filter(Boolean).join(' / '), formada: true }));
+    pares.forEach(([a, b]) => T.duplas.push({ id: uid(), j1: a.nome, j2: b.nome, n1: a.nivel, n2: b.nivel, tel: [a.tel, b.tel].filter(Boolean).join(' / '), formada: true, origem: [a, b] }));
     T.individuais = ps; toast(`${pares.length} dupla${pares.length !== 1 ? 's' : ''} formada${pares.length !== 1 ? 's' : ''}.${ps.length ? ' Fica 1 jogador à espera de par.' : ''}`); commit();
+  },
+  validarTodas() { T.individuais.forEach(p => { p.validado = true; }); commit(); },
+  async desfazer() {
+    const fs = T.duplas.filter(d => d.formada);
+    if (!fs.length) return;
+    const nosGrupos = fs.some(d => T.grupos.some(g => g.duplas.includes(d.id)));
+    if (!await confirmar(`Desfazer ${fs.length} dupla${fs.length > 1 ? 's' : ''} formada${fs.length > 1 ? 's' : ''}? Os jogadores voltam às inscrições individuais (já validados).${nosGrupos ? ' Os grupos e os jogos gerados são apagados.' : ''}`, 'Desfazer duplas')) return;
+    if (nosGrupos) { T.grupos = []; T.jogos = []; T.relogio = null; }
+    const volta = fs.flatMap(d => d.origem || [{ id: uid(), nome: d.j1, nivel: d.n1 || null, tel: '' }, { id: uid(), nome: d.j2, nivel: d.n2 || null, tel: '' }]);
+    T.individuais = [...T.individuais, ...volta.map(p => ({ ...p, validado: true }))].sort((a, b) => a.nome.localeCompare(b.nome, 'pt'));
+    T.duplas = T.duplas.filter(d => !d.formada); commit();
   },
   async gerarGrupos() {
     const n = +$('#n-grupos').value || 1, modo = $('#modo-grupos').value;
@@ -477,6 +507,8 @@ document.addEventListener('change', e => {
   if (!naPagina(e)) return;
   const el = e.target;
   if (el.id === 'mostrar-feitos') { mostrarFeitos = el.checked; render(); return; }
+  if (el.dataset.valida) { const p = T.individuais.find(x => x.id === el.dataset.valida); if (p) { p.validado = el.checked; commit(); } return; }
+  if (el.dataset.nivel) { const p = T.individuais.find(x => x.id === el.dataset.nivel); if (p) { p.nivel = +el.value || null; commit(); } return; }
   const k = el.dataset.cfg; if (!k) return;
   if (k.startsWith('pts.')) T.pts[k.slice(4)] = +el.value || 0;
   else if (k === 'duracao' || k === 'troca') T[k] = Math.max(0, +el.value || 0);
