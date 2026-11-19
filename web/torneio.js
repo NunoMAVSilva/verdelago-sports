@@ -102,6 +102,16 @@ function classif(t, g) {
   rows.sort((a, b) => b.P - a.P || (b.JG - b.JP) - (a.JG - a.JP) || b.JG - a.JG || h2h(a, b) || nomeD(t, a.id).localeCompare(nomeD(t, b.id)));
   return rows;
 }
+function folgas(t, s) {
+  const out = [];
+  for (const g of t.grupos) {
+    const js = t.jogos.filter(m => m.fase === 'grupo' && m.grupo === g.id && m.slot === s);
+    if (!js.length) continue;
+    const jogam = new Set(js.flatMap(m => [m.a, m.b]));
+    g.duplas.filter(id => !jogam.has(id)).forEach(id => out.push(id));
+  }
+  return out;
+}
 const pow2floor = n => { let s = 1; while (s * 2 <= n) s *= 2; return s; };
 const pow2ceil = n => { let s = 1; while (s < n) s *= 2; return s; };
 function tamanhoQuadro(t) {
@@ -393,6 +403,7 @@ function vJogos() {
     const ko = js[0].fase === 'ko';
     html += `<section><div class="slothead"><h3>${ko ? esc(NOME_RONDA[js[0].nm] || 'Eliminatória') : 'Ronda ' + (s + 1)}<span>${horaSlot(T, s)}</span></h3>
       ${relogioAtivo(s) ? '<span class="row"><b class="crono-grande" data-crono></b><button class="btn small on" data-act="pararRelogio">Parar cronómetro</button></span>' : `<button class="btn small ghost" data-act="relogio" data-slot="${s}">Iniciar cronómetro (${T.duracao} min)</button>`}</div>
+      ${(f => f.length ? `<p class="small" style="margin:-4px 0 10px"><b>Folga${f.length > 1 ? 'm' : ''}:</b> ${f.map(id => esc(nomeD(T, id))).join(' · ')}</p>` : '')(folgas(T, s))}
       <div class="jogos">${js.map(cardJogo).join('')}</div></section>`;
   }
   if (escondidas) html += `<p class="small muted">${escondidas} ronda${escondidas > 1 ? 's' : ''} terminada${escondidas > 1 ? 's' : ''} escondida${escondidas > 1 ? 's' : ''}.</p>`;
@@ -570,10 +581,12 @@ function slidesTV() {
   if (T.grupos.length && !(temKO() && faseGruposFeita())) {
     const quals = new Set(qualificados(T, tamanhoQuadro(T)).map(q => q.id));
     // 2 grupos por ecrã, um por baixo do outro (toda a largura para os nomes); a letra cresce até encher a altura
-    for (let i = 0; i < T.grupos.length; i += 2) {
-      const gs = T.grupos.slice(i, i + 2), linhas = gs.reduce((t, g) => t + g.duplas.length + 2.6, 0);
-      out.push({ id: 'class' + i, nome: gs.length === T.grupos.length ? 'Classificação' : 'Classificação · ' + gs.map(g => g.id).join(', '),
-        html: `<div class="tvs-grupos" style="grid-template-columns:minmax(0,1fr);${fsTV(3.2, 74 / (linhas * 1.75))}">${gs.map(g => `<div class="tvs-painel"><p class="tvs-sub">Grupo ${g.id}</p>${tabela(g, quals)}</div>`).join('')}</div>` });
+    const linhasDe = gs => gs.reduce((t, g) => t + g.duplas.length + 2.6, 0);
+    const porEcra = T.grupos.length > 1 && 72 / (linhasDe(T.grupos.slice(0, 2)) * 2) >= 2.6 ? 2 : 1; // 2 por ecrã se a letra ficar ≥ ~28 px
+    for (let i = 0; i < T.grupos.length; i += porEcra) {
+      const gs = T.grupos.slice(i, i + porEcra), linhas = linhasDe(gs);
+      out.push({ id: 'class' + i, nome: gs.length === T.grupos.length ? 'Classificação' : 'Classificação · Grupo' + (gs.length > 1 ? 's ' : ' ') + gs.map(g => g.id).join(', '),
+        html: `<div class="tvs-grupos" style="grid-template-columns:minmax(0,1fr);${fsTV(3.2, 72 / (linhas * 2))}">${gs.map(g => `<div class="tvs-painel"><p class="tvs-sub">Grupo ${g.id}</p>${tabela(g, quals)}</div>`).join('')}</div>` });
     }
   }
   if (temKO()) out.push({ id: 'quadro', nome: 'Eliminatórias', html: tvQuadro() });
@@ -588,7 +601,9 @@ const fsTV = (vw, vh) => `--fs:min(${vw.toFixed(2)}vw,${vh.toFixed(2)}vh)`;
 // cartões de jogos (ronda atual e "a seguir" com muitos jogos): colunas e letra conforme o número de campos
 function grelhaCartoes(n) {
   const cols = n <= 3 ? Math.max(1, n) : n === 4 ? 2 : n <= 6 ? 3 : 4, filas = Math.ceil(n / cols);
-  return { cols, estilo: `grid-template-columns:repeat(${cols},minmax(0,1fr));` + fsTV((cols <= 3 ? 9 : 8.4) / cols, 62 / (filas * 5.6)) };
+  // largura: um nome comprido (~18 letras) cabe numa linha do cartão; altura: cada cartão tem
+  // ~7,4 linhas de texto (campo, 4 nomes, "vs", margens) e há ~58% do ecrã para os cartões
+  return { cols, estilo: `grid-template-columns:repeat(${cols},minmax(0,1fr));` + fsTV((92 / cols - 3.6) / 9.6, 58 / (filas * 7.4)) };
 }
 // Dupla em duas linhas (um jogador por linha): no ecrã TV os nomes não se partem a meio
 const par = id => { const d = dupla(T, id); return d ? `<span class="par"><span>${esc(d.j1)}</span><span>${esc(d.j2)}</span></span>` : '—'; };
@@ -597,8 +612,9 @@ function tvRonda(s) {
   const ko = js[0] && js[0].fase === 'ko';
   const titulo = ko ? (NOME_RONDA[js[0].nm] || 'Eliminatória') : 'Ronda ' + (s + 1);
   const nome = id => id ? par(id) : 'A definir';
-  const g = grelhaCartoes(T.campos.length);
-  return `<p class="tvs-sub">${titulo} · ${horaSlot(T, s)}</p><div class="tvs-campos" style="${g.estilo}">${T.campos.map(cn => {
+  const usados = T.campos.filter(cn => js.some(x => x.campo === cn));
+  const g = grelhaCartoes(usados.length);
+  return `<p class="tvs-sub">${titulo} · ${horaSlot(T, s)}</p>${tvFolgas(s)}<div class="tvs-campos" style="${g.estilo}">${usados.map(cn => {
     const m = js.find(x => x.campo === cn);
     if (!m) return `<div class="tvs-campo livre"><div class="cn">${esc(nomeCampo(cn))}</div><div class="eq">Livre</div></div>`;
     const [A, Bq] = equipas(m);
@@ -610,14 +626,15 @@ function tvSeguir(p) {
   const ko = nx[0] && nx[0].fase === 'ko';
   const titulo = ko ? (NOME_RONDA[nx[0].nm] || 'Eliminatória') : 'Ronda ' + (p + 1);
   const n = (m, s, id) => id ? par(id) : esc(pendente(m, s));
-  const cab = `<p class="tvs-sub">${titulo} · ${horaSlot(T, p)}</p>`;
+  const cab = `<p class="tvs-sub">${titulo} · ${horaSlot(T, p)}</p>${tvFolgas(p)}`;
   // até 4 jogos: uma linha por jogo; mais: cartões em grelha (como a ronda atual), para caber no ecrã
-  if (nx.length <= 4) return cab + `<div class="tvs-lista" style="${fsTV(2.6, 60 / (Math.max(2, nx.length) * 2.6))}">${nx.map(m => { const [A, Bq] = equipas(m);
+  if (nx.length <= 4) return cab + `<div class="tvs-lista" style="${fsTV(2.6, 56 / (Math.max(2, nx.length) * 3.7))}">${nx.map(m => { const [A, Bq] = equipas(m);
     return `<div class="tvs-linha"><b class="cn">${esc(nomeCampo(m.campo))}</b><span>${n(m, 'a', A)}</span><i>vs</i><span>${n(m, 'b', Bq)}</span><small>${ko ? codKO(m) : 'Grupo ' + m.grupo}</small></div>`; }).join('')}</div>`;
   const g = grelhaCartoes(nx.length);
   return cab + `<div class="tvs-campos" style="${g.estilo}">${nx.map(m => { const [A, Bq] = equipas(m);
     return `<div class="tvs-campo"><div class="cn"><span>${esc(nomeCampo(m.campo))}</span><span>${ko ? codKO(m) : 'Grupo ' + m.grupo}</span></div><div class="eq"><span>${n(m, 'a', A)}</span></div><div class="vs">vs</div><div class="eq"><span>${n(m, 'b', Bq)}</span></div></div>`; }).join('')}</div>`;
 }
+function tvFolgas(s) { const f = folgas(T, s); return f.length ? `<p class="tvs-folga">Folga${f.length > 1 ? 'm' : ''}: ${f.map(id => esc(nomeD(T, id))).join(' · ')}</p>` : ''; }
 function tvQuadro() {
   const ko = T.jogos.filter(m => m.fase === 'ko' && !m.bye);
   const rondas = [...new Set(ko.map(m => m.ronda))].sort((a, b) => a - b);

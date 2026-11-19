@@ -235,8 +235,9 @@ table.cl{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;f
 @keyframes tvsEntra{from{opacity:0;transform:translateY(1.2vw)}to{opacity:1;transform:none}}
 .tvs-sub{font-family:var(--display);font-size:clamp(20px,2.2vw,44px);text-transform:uppercase;letter-spacing:.06em;color:#8fa79c;margin:0}
 .tvwrap.tvs{height:100vh;box-sizing:border-box;overflow:hidden}
+.tvs-folga{margin:-.6vw 0 0;font-size:clamp(16px,1.6vw,32px);color:#d6e4dc}
 .tvs-campos{display:grid;gap:1.4vw;flex:1;min-height:0;grid-auto-rows:1fr}
-.tvs-campo{background:#0f2a21;border:1px solid #1d4637;border-radius:1.2vw;padding:1.4vw 1.8vw;display:flex;flex-direction:column;justify-content:center;gap:.8vw;min-height:0}
+.tvs-campo{background:#0f2a21;border:1px solid #1d4637;border-radius:1.2vw;padding:1.4vw 1.8vw;display:flex;flex-direction:column;justify-content:center;gap:.25em;min-height:0;overflow:hidden}
 .tvs-campo .cn{font-family:var(--display);font-weight:700;color:#6fd3ad;font-size:calc(var(--fs,2.3vw)*.8);text-transform:uppercase;letter-spacing:.05em;display:flex;justify-content:space-between;gap:1vw}
 .tvs-campo .eq{font-size:var(--fs,2.3vw);font-weight:600;display:flex;justify-content:space-between;gap:1.5vw;line-height:1.15}
 .tvs-campo .eq b{font-family:var(--display);font-size:1.4em;font-variant-numeric:tabular-nums;color:#ffffff}
