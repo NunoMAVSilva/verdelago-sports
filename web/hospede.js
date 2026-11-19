@@ -1,5 +1,5 @@
 // Páginas do hóspede: reservar (#/) e ver/cancelar reserva (#/r/<token>). PT/EN.
-import { sb, $, esc, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, MODALIDADES, nomeMod, carregarBase, erroTexto, toast, confirmar, LOGO, autoAtualizar, ocupado } from './core.js?v=17';
+import { sb, $, esc, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, MODALIDADES, nomeMod, carregarBase, erroTexto, toast, confirmar, LOGO, autoAtualizar, ocupado } from './core.js?v=18';
 
 const TXT = {
   pt: {
@@ -77,7 +77,8 @@ export async function paginaReservar(app) {
   app.innerHTML = cabecalho() + '<main><div class="card vazio">…</div></main>';
   try { B = await carregarBase(); } catch (e) { app.querySelector('main').innerHTML = `<div class="card vazio">${esc(erroL(e))}</div>`; return; }
   B.espacos = B.espacos.filter(e => e.reserva_online);
-  const mods = [...new Set(B.espacos.map(e => e.modalidade))];
+  const ordemMod = Object.keys(MODALIDADES);
+  const mods = [...new Set(B.espacos.map(e => e.modalidade))].sort((a, b) => ordemMod.indexOf(a) - ordemMod.indexOf(b));
   S.mod = S.mod && mods.includes(S.mod) ? S.mod : mods[0];
   S.dia = S.dia || hoje();
   await carregarOcupacao();

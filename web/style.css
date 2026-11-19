@@ -192,6 +192,32 @@ body.tv .grelha tr{height:clamp(22px,1.9vw,40px)}
 .num{font-family:var(--display);font-weight:700;color:var(--muted);width:28px;display:inline-block;font-variant-numeric:tabular-nums}
 .nv{display:inline-block;font-size:11px;font-weight:700;color:var(--court);border:1px solid currentColor;border-radius:4px;padding:0 4px;margin-left:4px;vertical-align:1px}
 .chip.live{background:var(--court);color:#fff}
+/* separador Campos: planta do Sports Center + painel ao lado */
+.campos-vista{display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap}
+.campos-planta{flex:none;display:flex;flex-direction:column;gap:8px;max-width:100%}
+.campos-lado{flex:1 1 360px;min-width:0}
+.planta{position:relative;aspect-ratio:.52;height:min(calc(100vh - 210px),860px);min-height:520px;max-width:100%;background:#e4e9de;border-radius:14px;overflow:hidden}
+@media (max-width:760px){.campos-planta{width:100%}.planta{height:auto;width:100%;min-height:0}}
+.planta .pz{position:absolute;background:#d9cfb6;border-radius:6px}
+.planta .ped{position:absolute;background:#8f887a;color:#fff;border-radius:4px;font-size:10px;font-weight:600;display:flex;align-items:center;justify-content:center}
+.pc{position:absolute;box-sizing:border-box;border-radius:6px;padding:4px 5px;display:flex;flex-direction:column;align-items:flex-start;gap:1px;font:inherit;font-size:12px;line-height:1.15;text-align:left;overflow:hidden;cursor:pointer;border:2px solid #7fb39e;background:#f6f3ea;color:#13231d}
+.pc b{font-size:12px}.pc small{font-size:11px;white-space:nowrap}.pc .pt{font-weight:600;font-size:12px}
+.pc.uso{background:#0d6b52;border-color:#0d6b52;color:#fff}
+.pc.tor{background:#2463a3;border-color:#2463a3;color:#fff}
+.pc.blq{background:#8a958f;border-color:#8a958f;color:#fff}
+.pc.atraso{background:#fbeceb;border:3px solid #b3261e;color:#8c1d17}
+.pc.sel{outline:4px solid #d8f05a;outline-offset:-1px;z-index:2}
+.pc:focus-visible{outline:3px solid var(--court);outline-offset:1px}
+.pn{width:22px;height:22px;border-radius:50%;background:#1c241e;color:#fff;display:inline-flex;align-items:center;justify-content:center;font-family:Marcellus,Georgia,serif;font-size:13px;flex:none}
+.pn.grande{width:34px;height:34px;font-size:18px}
+.pc.uso .pn,.pc.tor .pn,.pc.blq .pn{background:#fff;color:#1c241e}
+.legenda{display:flex;flex-wrap:wrap;gap:10px;color:var(--muted)}
+.legenda span{display:inline-flex;align-items:center;gap:5px}
+.lg{width:14px;height:14px;border-radius:4px;display:inline-block;box-sizing:border-box;border:2px solid #7fb39e;background:#f6f3ea}
+.lg.uso{background:#0d6b52;border-color:#0d6b52}.lg.tor{background:#2463a3;border-color:#2463a3}.lg.blq{background:#8a958f;border-color:#8a958f}.lg.atraso{background:#fbeceb;border:2px solid #b3261e}
+.chip.est-uso{background:#0d6b52;color:#fff}.chip.est-tor{background:#2463a3;color:#fff}.chip.est-blq{background:#8a958f;color:#fff}.chip.est-atraso{background:var(--bad);color:#fff}.chip.est-livre{background:var(--soft)}
+.lista li.passado{opacity:.55}
+.aviso-mat{border-color:var(--bad)}
 .folga-box{background:var(--surface);border:2px solid var(--warn);border-radius:12px;padding:12px 16px;display:flex;flex-direction:column;gap:6px;font-size:16px}
 .folga{margin:-2px 0 10px;background:var(--soft);border-radius:8px;padding:8px 12px;font-size:15px}.folga span{color:var(--warn);font-weight:700;margin-right:4px}
 .crono-grande{font-family:var(--display);font-size:30px;font-variant-numeric:tabular-nums;line-height:1;color:var(--court)}
