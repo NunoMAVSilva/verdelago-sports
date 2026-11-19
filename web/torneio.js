@@ -2,7 +2,7 @@
 // Vem da app "Torneios de Pádel Verdelago" (artefacto). O estado fica em torneios.dados;
 // nome, dias, hora de início e campos são os do torneio (que bloqueia os campos na grelha).
 // #/torneio/<id> (staff) · #/tv/torneio[/<id>] (público, via torneio_tv)
-import { sb, $, esc, hora, dataLonga, carregarBase, erroTexto, toast, confirmar, LOGO } from './core.js?v=16';
+import { sb, $, esc, hora, dataLonga, carregarBase, erroTexto, toast, confirmar, LOGO } from './core.js?v=17';
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const LETRAS = 'ABCDEFGHIJKLMNOP';
@@ -447,7 +447,7 @@ function vQuadro() {
 /* ---------- ações (staff) ---------- */
 const ACTS = {
   async editarBloq() {
-    const { editarTorneio } = await import('./rececao.js?v=16');
+    const { editarTorneio } = await import('./rececao.js?v=17');
     editarTorneio(R, B, async () => { if (await carregar(R.id)) render(); });
   },
   async estenderBloq() {
@@ -585,10 +585,13 @@ export async function paginaTVTorneio(el, id) {
 // Lista de ecrãs com conteúdo neste momento (os vazios saltam-se).
 function slidesTV() {
   const out = [], c = campeao();
+  // fase de grupos acabada e eliminatórias ainda por gerar: a TV mostra só a classificação final
+  const fimGrupos = T.grupos.length > 0 && !temKO() && faseGruposFeita();
   if (c) out.push({ id: 'campeao', nome: 'Vencedores', html: `<div class="tvs-campeao"><span>Vencedores do torneio</span><b>${esc(nomeD(T, c))}</b></div>` });
-  else {
+  else if (!fimGrupos) {
     const s = slotAtual();
-    if (s != null) out.push({ id: 'ronda', nome: 'A decorrer', html: tvRonda(s) });
+    // uma ronda com todos os resultados não aparece como "a decorrer" (ex.: cronómetro esquecido)
+    if (s != null && !T.jogos.filter(m => m.slot === s).every(jogado)) out.push({ id: 'ronda', nome: 'A decorrer', html: tvRonda(s) });
   }
   if (T.grupos.length && !(temKO() && faseGruposFeita())) {
     const quals = new Set(qualificados(T, tamanhoQuadro(T)).map(q => q.id));
@@ -597,12 +600,12 @@ function slidesTV() {
     const porEcra = T.grupos.length > 1 && 72 / (linhasDe(T.grupos.slice(0, 2)) * 2) >= 2.6 ? 2 : 1; // 2 por ecrã se a letra ficar ≥ ~28 px
     for (let i = 0; i < T.grupos.length; i += porEcra) {
       const gs = T.grupos.slice(i, i + porEcra), linhas = linhasDe(gs);
-      out.push({ id: 'class' + i, nome: gs.length === T.grupos.length ? 'Classificação' : 'Classificação · Grupo' + (gs.length > 1 ? 's ' : ' ') + gs.map(g => g.id).join(', '),
-        html: `<div class="tvs-grupos" style="grid-template-columns:minmax(0,1fr);${fsTV(3.2, 72 / (linhas * 2))}">${gs.map(g => `<div class="tvs-painel"><p class="tvs-sub">Grupo ${g.id}</p>${tabela(g, quals)}</div>`).join('')}</div>` });
+      out.push({ id: 'class' + i, nome: (fimGrupos ? 'Classificação final' : 'Classificação') + (gs.length === T.grupos.length ? '' : ' · Grupo' + (gs.length > 1 ? 's ' : ' ') + gs.map(g => g.id).join(', ')),
+        html: (fimGrupos ? '<p class="tvs-folga">Fase de grupos terminada · a seguir: eliminatórias (passam os assinalados a verde)</p>' : '') + `<div class="tvs-grupos" style="grid-template-columns:minmax(0,1fr);${fsTV(3.2, 72 / (linhas * 2))}">${gs.map(g => `<div class="tvs-painel"><p class="tvs-sub">Grupo ${g.id}</p>${tabela(g, quals)}</div>`).join('')}</div>` });
     }
   }
   if (temKO()) out.push({ id: 'quadro', nome: 'Eliminatórias', html: tvQuadro() });
-  if (!c) {
+  if (!c && !fimGrupos) {
     const s = slotAtual(), p = s == null ? null : proxSlot(s);
     if (p != null) out.push({ id: 'seguir', nome: 'A seguir', html: tvSeguir(p) });
   }
@@ -672,8 +675,10 @@ function desenharTV(animar) {
 }
 function tvBarra() { const b = $('#tvbarra'); if (b) b.style.width = Math.min(100, (Date.now() - tvDesde) / ROTACAO_MS * 100) + '%'; }
 // Tempo que falta no cronómetro da ronda (null se parado)
+// cronómetro de uma ronda que já tem todos os resultados: não mostrar (fica a hora)
+const cronoAcabado = () => T.jogos.filter(m => m.slot === T.relogio.slot).every(jogado);
 function contagem() {
-  if (!T || !T.relogio) return null;
+  if (!T || !T.relogio || cronoAcabado()) return null;
   const rest = Math.round((T.relogio.inicio + T.relogio.dur * 1000 - Date.now()) / 1000);
   return { rest, txt: rest <= 0 ? 'TEMPO' : String(Math.floor(rest / 60)).padStart(2, '0') + ':' + String(rest % 60).padStart(2, '0'), cls: rest <= 0 ? 'tempo' : rest <= 60 ? 'fim' : '' };
 }
@@ -684,7 +689,7 @@ function atualizarCrono() {
 }
 function tvRelogio() {
   const el = $('#tvclock'); if (!el) return;
-  if (T && T.relogio) {
+  if (T && T.relogio && !cronoAcabado()) {
     const rest = Math.round((T.relogio.inicio + T.relogio.dur * 1000 - Date.now()) / 1000);
     el.className = 'tvclock' + (rest <= 0 ? ' tempo' : rest <= 60 ? ' fim' : '');
     el.innerHTML = `<small>Tempo de jogo</small>${rest <= 0 ? 'TEMPO' : String(Math.floor(rest / 60)).padStart(2, '0') + ':' + String(rest % 60).padStart(2, '0')}`;
