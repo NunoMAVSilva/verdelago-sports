@@ -520,10 +520,11 @@ function slidesTV() {
   }
   if (T.grupos.length && !(temKO() && faseGruposFeita())) {
     const quals = new Set(qualificados(T, tamanhoQuadro(T)).map(q => q.id));
-    const porEcra = T.grupos.length <= 2 ? 2 : T.grupos.length <= 4 ? 2 : 3;
-    for (let i = 0; i < T.grupos.length; i += porEcra) {
-      const gs = T.grupos.slice(i, i + porEcra);
-      out.push({ id: 'class' + i, nome: gs.length === T.grupos.length ? 'Classificação' : 'Classificação · ' + gs.map(g => g.id).join(', '), html: `<div class="tvs-grupos" style="grid-template-columns:repeat(${gs.length},minmax(0,1fr))">${gs.map(g => `<div class="tvs-painel"><p class="tvs-sub">Grupo ${g.id}</p>${tabela(g, quals)}</div>`).join('')}</div>` });
+    // 2 grupos por ecrã, um por baixo do outro (toda a largura para os nomes); a letra cresce até encher a altura
+    for (let i = 0; i < T.grupos.length; i += 2) {
+      const gs = T.grupos.slice(i, i + 2), linhas = gs.reduce((t, g) => t + g.duplas.length + 2.6, 0);
+      out.push({ id: 'class' + i, nome: gs.length === T.grupos.length ? 'Classificação' : 'Classificação · ' + gs.map(g => g.id).join(', '),
+        html: `<div class="tvs-grupos" style="grid-template-columns:minmax(0,1fr);${fsTV(3.2, 74 / (linhas * 1.75))}">${gs.map(g => `<div class="tvs-painel"><p class="tvs-sub">Grupo ${g.id}</p>${tabela(g, quals)}</div>`).join('')}</div>` });
     }
   }
   if (temKO()) out.push({ id: 'quadro', nome: 'Eliminatórias', html: tvQuadro() });
@@ -533,30 +534,39 @@ function slidesTV() {
   }
   return out.length ? out : [{ id: 'vazio', nome: '', html: '<p class="tvs-sub">Sem jogos marcados</p>' }];
 }
+// Letra adaptativa: o maior tamanho que cabe na largura (por coluna) e na altura (por linhas de texto).
+const fsTV = (vw, vh) => `--fs:min(${vw.toFixed(2)}vw,${vh.toFixed(2)}vh)`;
+// cartões de jogos (ronda atual e "a seguir" com muitos jogos): colunas e letra conforme o número de campos
+function grelhaCartoes(n) {
+  const cols = n <= 3 ? Math.max(1, n) : n === 4 ? 2 : n <= 6 ? 3 : 4, filas = Math.ceil(n / cols);
+  return { cols, estilo: `grid-template-columns:repeat(${cols},minmax(0,1fr));` + fsTV((cols <= 3 ? 9 : 8.4) / cols, 62 / (filas * 5.6)) };
+}
+// Dupla em duas linhas (um jogador por linha): no ecrã TV os nomes não se partem a meio
+const par = id => { const d = dupla(T, id); return d ? `<span class="par"><span>${esc(d.j1)}</span><span>${esc(d.j2)}</span></span>` : '—'; };
 function tvRonda(s) {
   const js = T.jogos.filter(m => m.slot === s);
   const ko = js[0] && js[0].fase === 'ko';
   const titulo = ko ? (NOME_RONDA[js[0].nm] || 'Eliminatória') : 'Ronda ' + (s + 1);
-  const nome = id => id ? esc(nomeD(T, id)) : 'A definir';
-  const n = T.campos.length, cols = n <= 3 ? n : n === 4 ? 2 : n <= 6 ? 3 : 4;
-  return `<p class="tvs-sub">${titulo} · ${horaSlot(T, s)}</p><div class="tvs-campos" style="grid-template-columns:repeat(${Math.max(1, cols)},minmax(0,1fr))">${T.campos.map(cn => {
+  const nome = id => id ? par(id) : 'A definir';
+  const g = grelhaCartoes(T.campos.length);
+  return `<p class="tvs-sub">${titulo} · ${horaSlot(T, s)}</p><div class="tvs-campos" style="${g.estilo}">${T.campos.map(cn => {
     const m = js.find(x => x.campo === cn);
     if (!m) return `<div class="tvs-campo livre"><div class="cn">${esc(nomeCampo(cn))}</div><div class="eq">Livre</div></div>`;
     const [A, Bq] = equipas(m);
-    return `<div class="tvs-campo"><div class="cn"><span>${esc(nomeCampo(cn))}</span><span>${ko ? codKO(m) : 'Grupo ' + m.grupo}</span></div><div class="eq"><span>${nome(A)}</span><b>${m.ga ?? ''}</b></div><div class="eq"><span>${nome(Bq)}</span><b>${m.gb ?? ''}</b></div></div>`;
+    return `<div class="tvs-campo"><div class="cn"><span>${esc(nomeCampo(cn))}</span><span>${ko ? codKO(m) : 'Grupo ' + m.grupo}</span></div><div class="eq"><span>${nome(A)}</span><b>${m.ga ?? ''}</b></div><div class="vs">vs</div><div class="eq"><span>${nome(Bq)}</span><b>${m.gb ?? ''}</b></div></div>`;
   }).join('')}</div>`;
 }
 function tvSeguir(p) {
   const nx = T.jogos.filter(m => m.slot === p).sort(porCampo);
   const ko = nx[0] && nx[0].fase === 'ko';
   const titulo = ko ? (NOME_RONDA[nx[0].nm] || 'Eliminatória') : 'Ronda ' + (p + 1);
-  const n = (m, s, id) => id ? esc(nomeD(T, id)) : esc(pendente(m, s));
+  const n = (m, s, id) => id ? par(id) : esc(pendente(m, s));
   const cab = `<p class="tvs-sub">${titulo} · ${horaSlot(T, p)}</p>`;
   // até 4 jogos: uma linha por jogo; mais: cartões em grelha (como a ronda atual), para caber no ecrã
-  if (nx.length <= 4) return cab + `<div class="tvs-lista">${nx.map(m => { const [A, Bq] = equipas(m);
+  if (nx.length <= 4) return cab + `<div class="tvs-lista" style="${fsTV(2.6, 60 / (Math.max(2, nx.length) * 2.6))}">${nx.map(m => { const [A, Bq] = equipas(m);
     return `<div class="tvs-linha"><b class="cn">${esc(nomeCampo(m.campo))}</b><span>${n(m, 'a', A)}</span><i>vs</i><span>${n(m, 'b', Bq)}</span><small>${ko ? codKO(m) : 'Grupo ' + m.grupo}</small></div>`; }).join('')}</div>`;
-  const cols = nx.length <= 6 ? 3 : 4;
-  return cab + `<div class="tvs-campos" style="grid-template-columns:repeat(${cols},minmax(0,1fr))">${nx.map(m => { const [A, Bq] = equipas(m);
+  const g = grelhaCartoes(nx.length);
+  return cab + `<div class="tvs-campos" style="${g.estilo}">${nx.map(m => { const [A, Bq] = equipas(m);
     return `<div class="tvs-campo"><div class="cn"><span>${esc(nomeCampo(m.campo))}</span><span>${ko ? codKO(m) : 'Grupo ' + m.grupo}</span></div><div class="eq"><span>${n(m, 'a', A)}</span></div><div class="vs">vs</div><div class="eq"><span>${n(m, 'b', Bq)}</span></div></div>`; }).join('')}</div>`;
 }
 function tvQuadro() {
@@ -576,7 +586,7 @@ function desenharTV(animar) {
   // se os ecrãs mudaram (ex.: acabou a ronda), manter o mesmo tipo de ecrã quando ainda existe
   if (!animar && tvSlideAtual && sl.id !== tvSlideAtual) { const i = ss.findIndex(x => x.id === tvSlideAtual); if (i >= 0) tvIdx = i; }
   const atual = ss[tvIdx % ss.length]; tvSlideAtual = atual.id;
-  app.innerHTML = `<div class="tvwrap"><header class="tvtop"><div class="brand">${LOGO}<div><div class="eyebrow">Verdelago · Pádel · ${esc(T.nome)}</div><h1>${esc(atual.nome)}</h1></div></div><div class="tvclock" id="tvclock"></div></header>
+  app.innerHTML = `<div class="tvwrap tvs"><header class="tvtop"><div class="brand">${LOGO}<div><div class="eyebrow">Verdelago · Pádel · ${esc(T.nome)}</div><h1>${esc(atual.nome)}</h1></div></div><div class="tvclock" id="tvclock"></div></header>
   <section class="tvs-slide${animar ? ' entra' : ''}">${atual.html}</section>
   ${ss.length > 1 ? `<footer class="tvs-pe">${ss.map((x, i) => `<span class="${i === tvIdx % ss.length ? 'on' : ''}">${esc(x.nome)}</span>`).join('')}<i class="tvs-barra"><i id="tvbarra"></i></i></footer>` : ''}
   <a class="tvsair" href="#/tv">Ocupação dos campos</a></div>`;
