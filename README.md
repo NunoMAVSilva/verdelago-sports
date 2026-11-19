@@ -96,7 +96,7 @@ Site estático (HTML + JS, sem build). Uma só página com rotas:
 | `#/rececao` | Painel da receção (login; atualiza sozinho via Supabase Realtime e de 30 em 30 s): grelha do dia, reservas e bloqueios, cacifos e material por preparar, mensagem para o hóspede por WhatsApp/email |
 | `#/torneio/<id>` | Gerir um torneio (staff): inscrições, grupos, jogos, eliminatórias |
 | `#/tv` | Ecrã TV: ocupação do dia, atualiza de 20 em 20 s |
-| `#/tv/torneio` | Ecrã TV do torneio do dia (atualiza a cada 5 s) |
+| `#/tv/torneio` | Ecrã TV do torneio do dia: ronda a decorrer, classificação/quadro e a seguir, em ecrãs que rodam a cada 20 s (dados a cada 5 s) |
 
 Publicado em **https://nunomavsilva.github.io/verdelago-sports/** (GitHub Pages; cada push para `main` que mexa em `web/` publica automaticamente).
 

@@ -224,25 +224,41 @@ table.cl{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;f
 .campeao b{font-family:var(--display);font-size:28px;display:block}
 .tvclock small{display:block;font-size:clamp(12px,1.1vw,20px);letter-spacing:.14em;text-transform:uppercase;color:#8fa79c;font-weight:600}
 .tvclock.fim{color:#ffc65c} .tvclock.tempo{color:#ff6b5f}
-.tvgrid{display:grid;grid-template-columns:1.25fr 1fr;gap:1.6vw;flex:1}
-@media (max-width:900px){.tvgrid{grid-template-columns:1fr}}
 .tvh{font-family:var(--display);font-size:clamp(16px,1.5vw,28px);text-transform:uppercase;letter-spacing:.08em;color:#8fa79c;margin:0 0 .8vw}
-.tvcourts{display:grid;grid-template-columns:repeat(2,1fr);gap:.9vw}
-.court{background:#0f2a21;border:1px solid #1d4637;border-radius:1vw;padding:1vw 1.2vw;display:flex;flex-direction:column;gap:.3vw;min-height:6vw}
-.court .cn{font-family:var(--display);font-weight:700;color:#6fd3ad;font-size:clamp(14px,1.2vw,22px);text-transform:uppercase;letter-spacing:.06em;display:flex;justify-content:space-between}
-.court .eq{font-size:clamp(14px,1.35vw,26px);font-weight:600;display:flex;justify-content:space-between;gap:1vw}
-.court .eq b{font-family:var(--display);font-size:1.3em;font-variant-numeric:tabular-nums}
-.court.livre{opacity:.45}
-.tvnext{margin-top:1.2vw;display:grid;grid-template-columns:repeat(2,1fr);gap:.4vw 1.2vw;font-size:clamp(12px,1.05vw,20px);color:#b9cbc2}
-.tvnext b{color:#6fd3ad;font-family:var(--display)}
-.tvpanel{background:#0c1d17;border:1px solid #183a2e;border-radius:1vw;padding:1.2vw 1.4vw}
-.tvpanel table.cl{font-size:clamp(13px,1.25vw,24px)}
-.tvpanel .cl th{color:#8fa79c;border-color:#1f3d32;font-size:clamp(10px,.8vw,15px)}
-.tvpanel .cl td{border-color:#1f3d32}
-.tvpanel .cl tr.q td:first-child{box-shadow:inset .3vw 0 0 #3fb08b}
-.tvpanel + .tvpanel{margin-top:1.2vw}
-.tvko{display:flex;flex-direction:column;gap:.6vw;font-size:clamp(13px,1.2vw,22px)}
-.tvko div{display:flex;justify-content:space-between;gap:1vw;border-bottom:1px solid #1f3d32;padding:.3vw 0}
-.tvko .w{color:#6fd3ad;font-weight:700}
-.tvcamp{background:#3fb08b;color:#06130e;border-radius:1vw;padding:1.4vw;font-size:clamp(16px,1.6vw,30px)}
-.tvcamp b{font-family:var(--display);display:block;font-size:2em;line-height:1}
+/* ecrã TV do torneio: 3 ecrãs a rodar (ronda, classificação, a seguir), letra grande */
+.tvs-slide{flex:1;display:flex;flex-direction:column;gap:1.2vw;min-height:0;overflow:hidden}
+.tvs-slide.entra{animation:tvsEntra .6s ease-out}
+@keyframes tvsEntra{from{opacity:0;transform:translateY(1.2vw)}to{opacity:1;transform:none}}
+.tvs-sub{font-family:var(--display);font-size:clamp(20px,2.2vw,44px);text-transform:uppercase;letter-spacing:.06em;color:#8fa79c;margin:0}
+.tvs-campos{display:grid;gap:1.4vw;flex:1;align-content:start}
+.tvs-campo{background:#0f2a21;border:1px solid #1d4637;border-radius:1.2vw;padding:1.4vw 1.8vw;display:flex;flex-direction:column;gap:.8vw}
+.tvs-campo .cn{font-family:var(--display);font-weight:700;color:#6fd3ad;font-size:clamp(18px,1.9vw,38px);text-transform:uppercase;letter-spacing:.05em;display:flex;justify-content:space-between;gap:1vw}
+.tvs-campo .eq{font-size:clamp(20px,2.3vw,48px);font-weight:600;display:flex;justify-content:space-between;gap:1.5vw;line-height:1.15}
+.tvs-campo .eq b{font-family:var(--display);font-size:1.4em;font-variant-numeric:tabular-nums;color:#ffffff}
+.tvs-campo.livre{opacity:.45}
+.tvs-campo .vs{color:#8fa79c;font-size:clamp(14px,1.3vw,26px);margin:-.4vw 0}
+.tvs-grupos,.tvs-quadro{display:grid;gap:1.6vw;flex:1;align-content:start}
+.tvs-painel{background:#0c1d17;border:1px solid #183a2e;border-radius:1.2vw;padding:1.4vw 1.6vw;display:flex;flex-direction:column;gap:.8vw}
+.tvs-painel table.cl{font-size:clamp(16px,1.75vw,36px)}
+.tvs-painel .cl th{color:#8fa79c;border-color:#1f3d32;font-size:clamp(11px,1vw,20px)}
+.tvs-painel .cl td{border-color:#1f3d32;padding:.6vw .4vw}
+.tvs-painel .cl td:not(:nth-child(2)),.tvs-painel .cl th{white-space:nowrap}
+.tvs-painel .cl tr.q td:first-child{box-shadow:inset .35vw 0 0 #3fb08b}
+.tvs-lista{display:flex;flex-direction:column;gap:1vw}
+.tvs-linha{display:grid;grid-template-columns:minmax(0,13vw) minmax(0,1fr) auto minmax(0,1fr) auto;gap:1.4vw;align-items:baseline;background:#0f2a21;border:1px solid #1d4637;border-radius:1vw;padding:1.2vw 1.6vw;font-size:clamp(18px,2vw,42px);font-weight:600}
+.tvs-linha .cn{font-family:var(--display);color:#6fd3ad;text-transform:uppercase;letter-spacing:.04em}
+.tvs-linha i{font-style:normal;color:#8fa79c;font-size:.75em}
+.tvs-linha small{color:#8fa79c;font-size:.6em;text-transform:uppercase;letter-spacing:.06em}
+.tvs-ko{display:flex;flex-direction:column;gap:1vw;font-size:clamp(15px,1.6vw,32px)}
+.tvs-ko div{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:1vw;border-bottom:1px solid #1f3d32;padding:.5vw 0}
+.tvs-ko div span:last-child{text-align:right}
+.tvs-ko b{font-family:var(--display);font-variant-numeric:tabular-nums}
+.tvs-ko .w{color:#6fd3ad;font-weight:700}
+.tvs-campeao{flex:1;background:#3fb08b;color:#06130e;border-radius:1.4vw;padding:3vw;display:flex;flex-direction:column;justify-content:center;font-size:clamp(22px,2.4vw,48px)}
+.tvs-campeao b{font-family:var(--display);display:block;font-size:2.6em;line-height:1.05}
+.tvs-pe{display:flex;align-items:center;gap:1.4vw;font-family:var(--display);font-size:clamp(14px,1.2vw,24px);text-transform:uppercase;letter-spacing:.06em;color:#5f7a6e}
+.tvs-pe span.on{color:#eaf2ed}
+.tvs-barra{flex:1;height:.35vw;min-height:3px;background:#183a2e;border-radius:99px;overflow:hidden;display:block}
+.tvs-barra i{display:block;height:100%;width:0;background:#3fb08b;transition:width .25s linear}
+@media (prefers-reduced-motion:reduce){.tvs-slide.entra{animation:none}.tvs-barra i{transition:none}}
+@media (max-width:900px){.tvs-campos,.tvs-grupos,.tvs-quadro{grid-template-columns:1fr!important}.tvs-linha{grid-template-columns:1fr}}
