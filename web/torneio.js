@@ -197,6 +197,7 @@ export async function paginaTorneio(el, id) {
   if (!await carregar(id)) return;
   render();
   // Outros aparelhos podem estar a lançar resultados: atualiza quando não há nada por gravar.
+  timers.push(setInterval(atualizarCrono, 1000));
   timers.push(setInterval(async () => {
     if (aGuardar || pendente_ || document.activeElement?.matches('input,select,textarea') || $('#modal').innerHTML) return;
     const { data } = await sb.from('torneios').select('atualizado_em').eq('id', R.id).maybeSingle();
@@ -238,10 +239,11 @@ function render() {
   const tabs = [['torneio', 'Torneio'], ['inscricoes', 'Inscrições'], ['grupos', 'Grupos'], ['jogos', 'Jogos'], ['quadro', 'Eliminatórias']];
   const y = scrollY;
   app.innerHTML = `<header class="top"><div class="brand">${LOGO}<div><div class="eyebrow">Verdelago · Pádel</div><div class="tname">${esc(T.nome)}</div></div></div>
-    <div class="top-r"><span id="estado-lig">${pillLig()}</span><a class="btn small on-dark" href="#/rececao">Receção</a></div></header>
+    <div class="top-r"><span class="pill crono" id="bo-crono" hidden></span><span id="estado-lig">${pillLig()}</span><a class="btn small on-dark" href="#/rececao">Receção</a></div></header>
     <nav class="tabs">${tabs.map(([k, l]) => `<a href="#/torneio/${R.id}" data-aba="${k}" class="${k === aba ? 'on' : ''}">${l}</a>`).join('')}<a class="tvlink" href="#/tv/torneio/${R.id}" target="_blank" rel="noopener">Ecrã TV ↗</a></nav>
     ${avisos()}<main>${VIEWS[aba]()}</main>`;
   app.querySelectorAll('[data-aba]').forEach(a => a.onclick = e => { e.preventDefault(); aba = a.dataset.aba; render(); scrollTo(0, 0); });
+  atualizarCrono();
   scrollTo(0, y);
 }
 function avisos() {
@@ -390,7 +392,7 @@ function vJogos() {
     if (!mostrarFeitos && js.every(jogado)) { escondidas++; continue; }
     const ko = js[0].fase === 'ko';
     html += `<section><div class="slothead"><h3>${ko ? esc(NOME_RONDA[js[0].nm] || 'Eliminatória') : 'Ronda ' + (s + 1)}<span>${horaSlot(T, s)}</span></h3>
-      ${relogioAtivo(s) ? '<button class="btn small on" data-act="pararRelogio">Cronómetro a correr · Parar</button>' : `<button class="btn small ghost" data-act="relogio" data-slot="${s}">Iniciar cronómetro (${T.duracao} min)</button>`}</div>
+      ${relogioAtivo(s) ? '<span class="row"><b class="crono-grande" data-crono></b><button class="btn small on" data-act="pararRelogio">Parar cronómetro</button></span>' : `<button class="btn small ghost" data-act="relogio" data-slot="${s}">Iniciar cronómetro (${T.duracao} min)</button>`}</div>
       <div class="jogos">${js.map(cardJogo).join('')}</div></section>`;
   }
   if (escondidas) html += `<p class="small muted">${escondidas} ronda${escondidas > 1 ? 's' : ''} terminada${escondidas > 1 ? 's' : ''} escondida${escondidas > 1 ? 's' : ''}.</p>`;
@@ -640,6 +642,17 @@ function desenharTV(animar) {
   tvRelogio(); tvBarra();
 }
 function tvBarra() { const b = $('#tvbarra'); if (b) b.style.width = Math.min(100, (Date.now() - tvDesde) / ROTACAO_MS * 100) + '%'; }
+// Tempo que falta no cronómetro da ronda (null se parado)
+function contagem() {
+  if (!T || !T.relogio) return null;
+  const rest = Math.round((T.relogio.inicio + T.relogio.dur * 1000 - Date.now()) / 1000);
+  return { rest, txt: rest <= 0 ? 'TEMPO' : String(Math.floor(rest / 60)).padStart(2, '0') + ':' + String(rest % 60).padStart(2, '0'), cls: rest <= 0 ? 'tempo' : rest <= 60 ? 'fim' : '' };
+}
+function atualizarCrono() {
+  const c = contagem(), p = $('#bo-crono');
+  if (p) { p.hidden = !c; if (c) { p.textContent = `Ronda ${T.relogio.slot + 1} · ${c.txt}`; p.className = 'pill crono ' + c.cls; } }
+  document.querySelectorAll('[data-crono]').forEach(el => { el.textContent = c ? c.txt : ''; el.className = 'crono-grande ' + (c ? c.cls : ''); });
+}
 function tvRelogio() {
   const el = $('#tvclock'); if (!el) return;
   if (T && T.relogio) {
