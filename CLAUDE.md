@@ -20,7 +20,7 @@ Responder ao utilizador em **português de Portugal**. A interface da receção 
 
 Material desportivo (balcão de empréstimos, PIN por posto): página própria `web/material/index.html` (vinda da app do Spa; tabelas `emprestimos` e `material_config`).
 Rotas do site: `#/` (reservar), `#/r/<token>` (reserva do hóspede), `#/rececao` (painel, login Supabase), `#/torneio/<id>` (gerir torneio, staff), `#/tv`, `#/tv/torneio[/<id>]`.
-Ficheiros: `core.js` (cliente Supabase, horas em Lisboa, grelha, diálogos), `hospede.js`, `rececao.js` (o separador **Campos**, o primeiro, é a planta do Sports Center em `planta.js`), `torneio.js` (app dos torneios de pádel), `tv.js`, `main.js` (router), `style.css`, `vendor/supabase-2.118.0.js`.
+Ficheiros: `core.js` (cliente Supabase, horas em Lisboa, grelha, diálogos), `hospede.js`, `rececao.js` (menu: **Home** = planta do Sports Center em `planta.js`, Reservas, Cacifos, Material = `material/` num iframe com `?embed=1`, Grelha do dia; à direita o menu **Apps** com Torneios, Ecrã TV e página dos hóspedes), `linhatempo.js` (linha do tempo do dia, usada na grelha e no ecrã TV), `torneio.js` (app dos torneios de pádel), `tv.js`, `main.js` (router), `style.css`, `vendor/supabase-2.118.0.js`.
 
 ## Regras do domínio
 

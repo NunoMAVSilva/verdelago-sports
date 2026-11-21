@@ -1,5 +1,6 @@
-// Ecrã TV (#/tv): ocupação de hoje em todos os espaços, atualiza de 20 em 20 s.
-import { sb, $, esc, hoje, dataLonga, carregarBase, grelha, erroTexto, LOGO, autoAtualizar } from './core.js?v=21';
+// Ecrã TV (#/tv): ocupação de hoje em todos os espaços em linha do tempo (como a grelha do dia), atualiza de 20 em 20 s.
+import { sb, $, esc, hoje, hora, dataLonga, carregarBase, erroTexto, LOGO, autoAtualizar } from './core.js?v=22';
+import { linhaTempo } from './linhatempo.js?v=22';
 
 let timers = [];
 export function pararTV() { timers.forEach(clearInterval); timers = []; document.body.classList.remove('tv'); }
@@ -14,11 +15,11 @@ export async function paginaTV(app) {
     const { data, error } = await sb.rpc('ocupacao', { p_dia: dia });
     if (error) return;
     app.innerHTML = `<div class="tvwrap"><header class="tvtop"><div class="brand">${LOGO}<div><div class="eyebrow">Verdelago · Sports Center</div><h1 class="cap">${esc(dataLonga(dia))}</h1></div></div><div class="tvclock" id="tvclock"></div></header>
-      ${grelha({ espacos: B.espacos, dia, itens: data.map((o, i) => ({ ...o, id: 'o' + i, label: o.titulo })) })}
+      ${linhaTempo({ espacos: B.espacos, dia, itens: data.map((o, i) => ({ ...o, id: 'o' + i })), interativo: false,
+        rotulo: o => o.titulo, detalhe: o => `${hora(o.inicio)}–${hora(o.fim)}`,
+        legenda: '<span><i class="lg uso"></i>Reservado</span><span><i class="lg tor"></i>Torneio</span><span><i class="lg blq"></i>Indisponível</span><span><i class="lt-agora-lg"></i>Agora</span>' })}
       <a class="tvsair" href="#/rececao">Sair</a></div>`;
     relogio();
-    const agora = app.querySelector('tr.agora');
-    if (agora) agora.scrollIntoView({ block: 'center' });
   };
   const relogio = () => { const el = $('#tvclock'); if (el) el.textContent = new Intl.DateTimeFormat('pt-PT', { timeZone: 'Europe/Lisbon', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date()); };
   await desenhar();
