@@ -126,7 +126,8 @@ export function confirmar(msg, okTxt = 'Confirmar', perigo = true, voltarTxt = '
       });
   });
 }
-export const LOGO = '<svg class="mark" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="17" fill="#d8f05a" stroke="#0a3d2e" stroke-width="2"/><path d="M6 13c8 3 8 11 0 14M34 13c-8 3-8 11 0 14" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>';
+// Símbolo da marca Verdelago Sports Center (areia), para os cabeçalhos escuros
+export const LOGO = '<img class="mark" src="img/simbolo-areia.png" alt="" width="46" height="38">';
 
 /**
  * Grelha do dia: linhas = intervalos de passo (30 min), colunas = espaços.

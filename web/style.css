@@ -24,9 +24,11 @@ button,input,select{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--court);outline-offset:2px}
 a{color:var(--court)}
 
-.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 20px;background:var(--accent);color:var(--accent-ink)}
+/* cores da marca: verde-escuro #22302a e areia #d6c8ab (logótipos Verdelago Sports Center) */
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 20px;background:#22302a;color:#fff}
+.top .eyebrow{color:#d6c8ab;opacity:1}
 .brand{display:flex;gap:12px;align-items:center;min-width:0}
-.mark{width:38px;height:38px;flex:none}
+.mark{height:38px;width:auto;flex:none;display:block}
 .eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.12em;opacity:.85;font-weight:600}
 .tname{font-family:var(--display);font-size:24px;font-weight:700;line-height:1.1}
 .top-r{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
