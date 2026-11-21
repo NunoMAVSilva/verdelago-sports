@@ -1,5 +1,5 @@
 // Páginas do hóspede: reservar (#/) e ver/cancelar reserva (#/r/<token>). PT/EN.
-import { sb, $, esc, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, MODALIDADES, nomeMod, carregarBase, erroTexto, toast, confirmar, LOGO, autoAtualizar, ocupado } from './core.js?v=19';
+import { sb, $, esc, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, MODALIDADES, nomeMod, carregarBase, erroTexto, toast, confirmar, LOGO, autoAtualizar, ocupado } from './core.js?v=20';
 
 const TXT = {
   pt: {
@@ -77,8 +77,7 @@ export async function paginaReservar(app) {
   app.innerHTML = cabecalho() + '<main><div class="card vazio">…</div></main>';
   try { B = await carregarBase(); } catch (e) { app.querySelector('main').innerHTML = `<div class="card vazio">${esc(erroL(e))}</div>`; return; }
   B.espacos = B.espacos.filter(e => e.reserva_online);
-  const ordemMod = Object.keys(MODALIDADES);
-  const mods = [...new Set(B.espacos.map(e => e.modalidade))].sort((a, b) => ordemMod.indexOf(a) - ordemMod.indexOf(b));
+  const mods = modsOrdenadas();
   S.mod = S.mod && mods.includes(S.mod) ? S.mod : mods[0];
   S.dia = S.dia || hoje();
   await carregarOcupacao();
@@ -87,6 +86,8 @@ export async function paginaReservar(app) {
   autoAtualizar(async () => { await carregarOcupacao(); desenhar(app); }, 60000,
     () => !ocupado() && ![...document.querySelectorAll('#app form input, #app form textarea')].some(i => i.type === 'checkbox' ? i.checked : i.value.trim()));
 }
+// modalidades por ordem fixa (Pádel primeiro), não pela ordem dos campos
+const modsOrdenadas = () => { const o = Object.keys(MODALIDADES); return [...new Set(B.espacos.map(e => e.modalidade))].sort((a, b) => o.indexOf(a) - o.indexOf(b)); };
 async function carregarOcupacao() {
   S.aCarregar = true;
   const { data, error } = await sb.rpc('ocupacao', { p_dia: S.dia });
@@ -127,7 +128,7 @@ function desenhar(app) {
     <p class="muted" style="margin:0">${esc(t('sub'))}</p>
     ${minhas.length ? `<section class="card stack"><h2>${esc(t('minhas'))}</h2><ul class="lista">${minhas.map(r => `<li><span>${esc(r.resumo)}</span><a class="btn small ghost" href="#/r/${esc(r.token)}">${esc(t('verRes'))}</a></li>`).join('')}</ul></section>` : ''}
     <section class="card stack">
-      <div class="passo"><h3>${esc(t('mod'))}</h3><div class="chips">${[...new Set(B.espacos.map(e => e.modalidade))].map(m => chip('data-mod', m, m === S.mod, `${MODALIDADES[m]?.icon || ''} ${esc(nomeMod(m, lang))}`)).join('')}</div></div>
+      <div class="passo"><h3>${esc(t('mod'))}</h3><div class="chips">${modsOrdenadas().map(m => chip('data-mod', m, m === S.mod, `${MODALIDADES[m]?.icon || ''} ${esc(nomeMod(m, lang))}`)).join('')}</div></div>
       <div class="passo"><h3>${esc(t('dia'))}</h3><div class="chips">${dias.map(d => chip('data-dia', d, d === S.dia, esc(lblDia(d)))).join('')}</div></div>
       <div class="passo"><h3>${esc(t('dur'))}</h3><div class="chips">${durs.map(d => chip('data-dur', d, d === S.dur, `${d} ${t('min')}`)).join('')}</div></div>
       <div class="passo"><h3>${esc(t('hora'))} <span class="muted small">· ${esc(dataLonga(S.dia, lang))}</span></h3>
