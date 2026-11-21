@@ -38,7 +38,8 @@ a{color:var(--court)}
 .lang button.on{background:rgba(255,255,255,.22)}
 .btn.on-dark{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.4);color:inherit}
 
-.tabs{display:flex;gap:2px;padding:0 12px;background:var(--surface);border-bottom:1px solid var(--line);overflow-x:auto;position:sticky;top:0;z-index:5}
+.tabs{display:flex;align-items:stretch;gap:2px;padding:0 12px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.tabs-l{display:flex;gap:2px;overflow-x:auto;flex:1;min-width:0}
 .tabs a{padding:12px 14px;text-decoration:none;color:var(--muted);font-weight:600;border-bottom:3px solid transparent;white-space:nowrap}
 .tabs a.on{color:var(--ink);border-bottom-color:var(--accent)}
 .tabs a.tvlink{margin-left:auto}
@@ -339,3 +340,40 @@ table.cl{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;f
 .tvs-barra i{display:block;height:100%;width:0;background:#3fb08b;transition:width .25s linear}
 @media (prefers-reduced-motion:reduce){.tvs-slide.entra{animation:none}.tvs-barra i{transition:none}}
 @media (max-width:900px){.tvs-campos,.tvs-grupos,.tvs-quadro{grid-template-columns:1fr!important}.tvs-linha{grid-template-columns:1fr}}
+
+/* menu: separador com contador e menu Apps à direita */
+.tabs .cnt{display:inline-block;min-width:20px;padding:0 6px;margin-left:4px;border-radius:10px;background:var(--warn,#b26a00);color:#fff;font-size:12px;line-height:20px;text-align:center}
+.apps{position:relative;flex:none;display:flex}
+.apps summary{list-style:none;cursor:pointer;padding:12px 14px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.apps summary::-webkit-details-marker{display:none}
+.apps summary.on,.apps[open] summary{color:var(--ink)}.apps summary.on{border-bottom-color:var(--accent)}
+.apps-menu{position:absolute;right:0;top:calc(100% + 4px);min-width:270px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.14);padding:6px;display:flex;flex-direction:column;z-index:30}
+.apps-menu a{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:8px;text-decoration:none;color:var(--ink)}
+.apps-menu a:hover,.apps-menu a:focus-visible{background:var(--soft)}
+.apps-menu small{color:var(--muted);font-size:12px}
+/* material dentro do painel */
+main.largo.mat{padding:0;max-width:none}
+.mat-frame{display:block;width:100%;border:0;background:var(--bg)}
+/* lista de reservas */
+.pesquisa{width:100%;max-width:420px;font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink)}
+.res-lista li{display:grid;justify-content:stretch;grid-template-columns:56px 170px 1fr auto auto;gap:12px;align-items:center}
+.res-lista .rl-h{display:flex;flex-direction:column;line-height:1.15}.res-lista .rl-h small{color:var(--muted)}
+.res-lista .rl-c{display:flex;align-items:center;gap:8px}.res-lista .rl-c .pn{width:24px;height:24px;font-size:13px}
+.res-lista .rl-e{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+@media (max-width:700px){.res-lista li{grid-template-columns:48px 1fr auto}.res-lista .rl-c{grid-column:2}.res-lista .rl-q{grid-column:2}.res-lista .rl-e{grid-column:2;justify-content:flex-start}.res-lista li>button{grid-column:3;grid-row:1}}
+/* ecrã TV em linha do tempo (mesmo desenho da grelha do dia) */
+body.tv .lt{flex:1;display:flex;flex-direction:column;padding:.4vw 1vw .8vw;border-radius:1vw}
+body.tv .lt-linha{flex:1;height:auto;min-height:0;align-items:stretch}
+body.tv .lt-nome{align-self:center}
+body.tv .lt-pista{height:auto}
+body.tv .lt-linha.lt-horas{flex:none;height:clamp(24px,2.4vw,48px)}
+body.tv .lt-horas .lt-pista span{font-size:clamp(12px,1.05vw,22px)}
+body.tv .lt-nome{width:15vw;font-size:clamp(14px,1.2vw,26px);gap:.7vw}
+body.tv .lt-nome .pn{width:clamp(22px,1.9vw,40px);height:clamp(22px,1.9vw,40px);font-size:clamp(12px,1.05vw,22px)}
+body.tv .lt-pista{cursor:default}
+body.tv .lt-b{top:12%;bottom:12%;border-radius:.4vw;padding:0 .5vw;cursor:default}
+body.tv .lt-b b{font-size:clamp(12px,1vw,22px)}body.tv .lt-b small{font-size:clamp(11px,.85vw,18px)}
+body.tv .lt-passado{background:rgba(255,255,255,.035)}
+body.tv .lt-fora{background:repeating-linear-gradient(45deg,transparent 0 6px,rgba(255,255,255,.04) 6px 12px)}
+body.tv .lt-b.t-bloqueio{background:#4a554f}
+body.tv .legenda{font-size:clamp(12px,.95vw,20px);color:var(--muted)}

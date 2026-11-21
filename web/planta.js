@@ -1,7 +1,7 @@
 // Planta do Sports Center (vertical), desenhada a partir do mapa da sinalética.
 // Coordenadas no sistema do mapa (x 30–340, y 30–800); no ecrã são percentagens,
 // por isso a planta escala com o espaço disponível. Números = sinalética dos campos.
-import { esc } from './core.js?v=21';
+import { esc } from './core.js?v=22';
 
 const OX = 30, OY = 30, VW = 310, VH = 770;
 const pct = ([x0, y0, x1, y1]) =>
@@ -9,7 +9,7 @@ const pct = ([x0, y0, x1, y1]) =>
 
 // zonas de piso (fundo), edifícios e campos (id do espaço → retângulo)
 const ZONAS = [[98, 36, 224, 214], [86, 244, 240, 388], [256, 254, 336, 364], [60, 416, 314, 604], [30, 604, 322, 800]];
-const EDIFICIOS = [['Receção', [282, 368, 332, 392]], ['Ginásio', [146, 392, 222, 416]]];
+const EDIFICIOS = [['Receção', [282, 368, 332, 392]], ['Ginásio', [94, 392, 232, 416]]];
 const CAMPOS = {
   polidesportivo: [106, 44, 216, 206],
   'tenis-1': [94, 252, 160, 380],

@@ -1,8 +1,9 @@
 // Painel da receção (#/rececao): login, grelha do dia, reservas/bloqueios, torneios, cacifos.
-import { planta, numeroBadge } from './planta.js?v=21';
-import { sb, $, $$, esc, autoAtualizar, normQuarto, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, carregarBase, erroTexto, toast, dialogo, confirmar, grelha, LOGO } from './core.js?v=21';
+import { planta, numeroBadge } from './planta.js?v=22';
+import { linhaTempo, limitesDia } from './linhatempo.js?v=22';
+import { sb, $, $$, esc, autoAtualizar, normQuarto, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, carregarBase, erroTexto, toast, dialogo, confirmar, grelha, LOGO, ocupado } from './core.js?v=22';
 
-let ultImport = null, B = null, dia = hoje(), aba = 'campos', selCampo = null, materialFora = [], itens = [], cacifos = [], usosAtivos = [], porPreparar = [], naoDevolvidos = [], torneios = [], app = null, staffNome = '';
+let ultImport = null, B = null, dia = hoje(), aba = 'campos', filtro = '', selCampo = null, materialFora = [], itens = [], cacifos = [], usosAtivos = [], porPreparar = [], naoDevolvidos = [], torneios = [], app = null, staffNome = '';
 
 export async function paginaRececao(el) {
   app = el;
@@ -19,7 +20,8 @@ export async function paginaRececao(el) {
   try { B = await carregarBase(); } catch (e) { toast(erroTexto(e), 'erro'); return; }
   await recarregar();
   // Atualiza sozinho: na hora (Realtime) e, por segurança, de 30 em 30 s.
-  const pedir = autoAtualizar(() => recarregar(true), 30000);
+  // (no Material não: a página do balcão está aberta lá dentro e atualiza-se sozinha)
+  const pedir = autoAtualizar(() => recarregar(true), 30000, () => !ocupado() && aba !== 'material');
   pararRececao();
   canal = sb.channel('rececao')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'reservas' }, pedir)
@@ -86,14 +88,76 @@ function extra(r) {
   return r.origem === 'rececao' && r.tipo === 'reserva' ? 'pela receção' : '';
 }
 
+const ABAS = [['campos', 'Home'], ['reservas', 'Reservas'], ['cacifos', 'Cacifos'], ['material', 'Material'], ['grelha', 'Grelha do dia']];
+const VISTAS = { campos: [() => vCampos(), () => ligarCampos()], reservas: [() => vReservas(), () => ligarReservas()], cacifos: [() => vCacifos(), () => ligarCacifos()],
+  material: [() => vMaterial(), () => ligarMaterial()], grelha: [() => vGrelha(), () => ligarGrelha()], torneios: [() => vTorneios(), () => ligarTorneios()] };
 function desenhar() {
-  const tabs = [['campos', 'Campos'], ['grelha', 'Grelha do dia'], ['torneios', 'Torneios'], ['cacifos', `Cacifos e material${porPreparar.length ? ` (${porPreparar.length})` : ''}`]];
+  const conta = k => k === 'cacifos' && porPreparar.length ? ` <span class="cnt">${porPreparar.length}</span>` : '';
+  const [ver, ligar] = VISTAS[aba] || VISTAS.campos;
   app.innerHTML = topo(`<span class="pill">${esc(staffNome)}</span><button class="btn small on-dark" id="b-sair">Sair</button>`) +
-    `<nav class="tabs">${tabs.map(([k, l]) => `<a href="#/rececao" data-aba="${k}" class="${k === aba ? 'on' : ''}">${esc(l)}</a>`).join('')}<a class="tvlink" href="material/">Material desportivo ↗</a><a href="#/tv" target="_blank" rel="noopener">Ecrã TV ↗</a><a href="#/" target="_blank" rel="noopener">Página dos hóspedes ↗</a></nav>
-    <main class="largo">${aba === 'campos' ? vCampos() : aba === 'grelha' ? vGrelha() : aba === 'torneios' ? vTorneios() : vCacifos()}</main>`;
+    `<nav class="tabs"><div class="tabs-l">${ABAS.map(([k, l]) => `<a href="#/rececao" data-aba="${k}" class="${k === aba ? 'on' : ''}">${esc(l)}${conta(k)}</a>`).join('')}</div>
+    <details class="apps" id="apps"><summary class="${aba === 'torneios' ? 'on' : ''}">Apps <span aria-hidden="true">▾</span></summary><div class="apps-menu" role="menu">
+      <a href="#/rececao" data-aba="torneios" role="menuitem"><b>Torneios</b><small>Criar e gerir torneios de pádel</small></a>
+      <a href="#/tv" target="_blank" rel="noopener" role="menuitem"><b>Ecrã TV ↗</b><small>Ocupação dos campos para o ecrã</small></a>
+      <a href="#/tv/torneio" target="_blank" rel="noopener" role="menuitem"><b>Ecrã TV do torneio ↗</b><small>Torneio público de hoje</small></a>
+      <a href="#/" target="_blank" rel="noopener" role="menuitem"><b>Página dos hóspedes ↗</b><small>Reservas online (PT/EN)</small></a>
+    </div></details></nav>
+    <main class="largo${aba === 'material' ? ' mat' : ''}">${ver()}</main>`;
   $('#b-sair').onclick = sair;
-  $$('[data-aba]').forEach(a => a.onclick = e => { e.preventDefault(); aba = a.dataset.aba; if (aba === 'campos' && dia !== hoje()) { dia = hoje(); recarregar(); } else desenhar(); });
-  if (aba === 'campos') ligarCampos(); else if (aba === 'grelha') ligarGrelha(); else if (aba === 'torneios') ligarTorneios(); else ligarCacifos();
+  const apps = $('#apps');
+  apps.querySelectorAll('a').forEach(a => a.addEventListener('click', () => apps.open = false));
+  document.onclick = ev => { if (apps.open && !ev.target.closest('#apps')) apps.open = false; };
+  $$('[data-aba]').forEach(a => a.onclick = e => {
+    e.preventDefault(); const antes = aba; aba = a.dataset.aba;
+    if ((aba === 'campos' && dia !== hoje()) || antes === 'material') { if (aba === 'campos') dia = hoje(); recarregar(); } else desenhar();
+  });
+  ligar();
+}
+
+/* ---------- material: a página do balcão (material/) dentro do painel ---------- */
+function vMaterial() { return '<iframe class="mat-frame" id="mat-frame" src="material/?embed=1" title="Material desportivo"></iframe>'; }
+function ligarMaterial() {
+  const f = $('#mat-frame'), ajustar = () => { if (f.isConnected) f.style.height = Math.max(480, innerHeight - f.getBoundingClientRect().top - 4) + 'px'; };
+  ajustar(); addEventListener('resize', ajustar);
+}
+
+/* ---------- reservas do dia (lista com pesquisa) ---------- */
+const navDia = (direita = '') => `<div class="row between">
+      <div class="row"><button class="btn ghost small" data-dia="-1" aria-label="Dia anterior">◀</button><button class="btn ghost small" data-dia="0">Hoje</button><button class="btn ghost small" data-dia="1" aria-label="Dia seguinte">▶</button>
+      <input type="date" id="g-dia" value="${dia}" aria-label="Dia"><h2 class="cap">${esc(dataLonga(dia))}</h2></div>
+      <div class="row">${direita}<button class="btn small" id="b-novo">+ Reserva / bloqueio</button><button class="btn ghost small" id="b-rec">Atualizar</button></div>
+    </div>`;
+function ligarNav() {
+  $$('[data-dia]').forEach(b => b.onclick = () => { const d = +b.dataset.dia; dia = d === 0 ? hoje() : addDias(dia, d); recarregar(); });
+  $('#g-dia').onchange = e => { if (e.target.value) { dia = e.target.value; recarregar(); } };
+  $('#b-rec').onclick = () => recarregar();
+  $('#b-novo').onclick = () => novo(B.espacos[0].id, null);
+}
+const semAcentos = t => String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+function linhasReservas() {
+  const q = semAcentos(filtro.trim()), agora = Date.now();
+  const lista = itens.filter(r => r.tipo === 'reserva' && (!q || semAcentos([r.quarto, r.apelido, r.nome, nomeEsp(r.espaco_id), r.notas].join(' ')).includes(q)))
+    .sort((a, b) => new Date(a.inicio) - new Date(b.inicio));
+  if (!lista.length) return `<p class="muted card">${filtro ? 'Nenhuma reserva encontrada.' : 'Sem reservas neste dia.'}</p>`;
+  return `<ul class="lista card res-lista">${lista.map(r => { const e = B.espacos.find(x => x.id === r.espaco_id), u = usoAtivo(r);
+    const passado = new Date(r.fim) <= agora, agoraJa = new Date(r.inicio) <= agora && !passado;
+    return `<li class="${passado ? 'passado' : ''}"><span class="rl-h"><b>${hora(r.inicio)}</b><small>${hora(r.fim)}</small></span>
+      <span class="rl-c">${e ? numeroBadge(e) : ''}<span>${esc(nomeEsp(r.espaco_id))}</span></span>
+      <span class="rl-q"><b>${esc(r.quarto)}</b> ${esc(r.apelido)}${r.jogadores ? ` <span class="muted small">· ${r.jogadores} pess.</span>` : ''}${r.notas ? `<br><span class="muted small">${esc(r.notas)}</span>` : ''}</span>
+      <span class="rl-e">${agoraJa ? '<span class="chip est-uso">a decorrer</span>' : ''}${u ? `<span class="chip">🔒 cacifo ${u.cacifo_id}</span>` : r.precisa_material ? '<span class="chip warn">material por preparar</span>' : ''}${r.origem === 'rececao' ? '<span class="chip">receção</span>' : ''}</span>
+      <button class="btn ghost small" data-item="${r.id}">Abrir</button></li>`; }).join('')}</ul>`;
+}
+function vReservas() {
+  const n = itens.filter(r => r.tipo === 'reserva').length;
+  return `${navDia(`<span class="muted small">${n} reserva${n === 1 ? '' : 's'}</span>`)}
+    <input type="search" id="r-q" class="pesquisa" placeholder="Procurar quarto, apelido ou campo" value="${esc(filtro)}" aria-label="Procurar reservas">
+    <div id="r-lista">${linhasReservas()}</div>`;
+}
+function ligarReservas() {
+  ligarNav();
+  const ligarItens = () => $$('#r-lista [data-item]').forEach(b => b.onclick = () => detalhe(itens.find(r => r.id === b.dataset.item)));
+  $('#r-q').oninput = e => { filtro = e.target.value; $('#r-lista').innerHTML = linhasReservas(); ligarItens(); };
+  ligarItens();
 }
 
 /* ---------- campos: planta do Sports Center (agora) ---------- */
@@ -136,7 +200,7 @@ function postits(agora) {
       const pill = s === 'bad' ? `Atraso ${minutos(t - f.ate)}` : s === 'warn' ? `Faltam ${minutos(f.ate - t)}` : f.ate ? `Até ${hora(f.ate)}` : '';
       return `<article class="postit ${s}"><div class="r1"><span class="room">${esc(f.quarto)}</span>${pill ? `<span class="pill ${s}">${pill}</span>` : ''}</div>
         <div class="mat">${f.linhas.map(l => `<div>${l}</div>`).join('')}</div><div class="meta">${f.meta}</div>
-        <div class="acts">${f.tipo === 'cacifo' ? `<button class="btn small" data-dev-cac="${f.id}">Devolvido</button><button class="btn ghost danger small" data-nd-cac="${f.id}">Não devolvido</button>` : '<a class="btn small" href="material/">Devolver no balcão</a>'}</div></article>`; }).join('')}</div></section>`;
+        <div class="acts">${f.tipo === 'cacifo' ? `<button class="btn small" data-dev-cac="${f.id}">Devolvido</button><button class="btn ghost danger small" data-nd-cac="${f.id}">Não devolvido</button>` : '<a class="btn small" href="#/rececao" data-aba="material">Devolver no balcão</a>'}</div></article>`; }).join('')}</div></section>`;
 }
 function vCampos() {
   const agora = agoraD(), sel = B.espacos.find(e => e.id === selCampo);
@@ -182,52 +246,25 @@ function ligarCampos() {
 /* ---------- grelha ---------- */
 function vGrelha() {
   const n = itens.filter(r => r.tipo === 'reserva').length;
-  return `<div class="row between">
-      <div class="row"><button class="btn ghost small" data-dia="-1" aria-label="Dia anterior">◀</button><button class="btn ghost small" data-dia="0">Hoje</button><button class="btn ghost small" data-dia="1" aria-label="Dia seguinte">▶</button>
-      <input type="date" id="g-dia" value="${dia}" aria-label="Dia"><h2 class="cap">${esc(dataLonga(dia))}</h2></div>
-      <div class="row"><span class="muted small">${n} reserva${n === 1 ? '' : 's'}</span><button class="btn small" id="b-novo">+ Reserva / bloqueio</button><button class="btn ghost small" id="b-rec">Atualizar</button></div>
-    </div>
+  return `${navDia(`<span class="muted small">${n} reserva${n === 1 ? '' : 's'}</span>`)}
     <p class="small muted" style="margin:0">${ultImport ? `Lista de hóspedes (Beach OPS): ${ultImport.quartos} estadias, importada ${esc(dataCurta(diaDe(ultImport.em)))} às ${hora(ultImport.em)}${ultImport.por ? ' por ' + esc(ultImport.por) : ''}. ` : 'Lista de hóspedes ainda não importada no Beach OPS: os quartos não são validados. '}Toque num espaço vazio de um campo para reservar ou bloquear; toque numa marcação para ver detalhes, cancelar ou preparar cacifo.</p>
-    ${linhaTempo()}`;
+    ${linhaDia()}`;
 }
 function ligarGrelha() {
-  $$('[data-dia]').forEach(b => b.onclick = () => { const d = +b.dataset.dia; dia = d === 0 ? hoje() : addDias(dia, d); recarregar(); });
-  $('#g-dia').onchange = e => { if (e.target.value) { dia = e.target.value; recarregar(); } };
-  $('#b-rec').onclick = recarregar;
-  $('#b-novo').onclick = () => novo(B.espacos[0].id, null);
+  ligarNav();
   $$('.lt [data-item]').forEach(b => b.onclick = ev => { ev.stopPropagation(); detalhe(itens.find(r => r.id === b.dataset.item)); });
   // tocar num espaço vazio da pista: nova marcação nesse campo, à meia hora tocada
   $$('.lt-pista').forEach(p => p.onclick = ev => {
     if (ev.target.closest('[data-item]')) return;
     const e = B.espacos.find(x => x.id === p.dataset.pista), r = p.getBoundingClientRect();
-    const { ini, fim } = limitesDia(), m = ini + (ev.clientX - r.left) / r.width * (fim - ini);
+    const { ini, fim } = limitesDia(B.espacos), m = ini + (ev.clientX - r.left) / r.width * (fim - ini);
     novo(e.id, Math.min(e.fechaMin - e.passo_min, Math.max(e.abreMin, Math.floor(m / e.passo_min) * e.passo_min)));
   });
 }
-const limitesDia = () => ({ ini: Math.min(...B.espacos.map(e => e.abreMin)), fim: Math.max(...B.espacos.map(e => e.fechaMin)) });
-// Dia inteiro em linha do tempo: uma pista por campo, blocos com as marcações, linha vermelha na hora atual
-function linhaTempo() {
-  const { ini, fim } = limitesDia(), tot = fim - ini, base = lisboa(dia, 0).getTime();
-  const pos = t => Math.max(0, Math.min(100, ((t - base) / 60000 - ini) / tot * 100));
-  const agoraP = dia === hoje() ? pos(Date.now()) : dia < hoje() ? 100 : 0;
-  const horas = []; for (let m = ini; m < fim; m += 60) horas.push(m);
-  let h = `<div class="lt" role="region" aria-label="Marcações do dia por campo"><div class="lt-linha lt-horas"><span class="lt-nome"></span><div class="lt-pista">${horas.map(m => `<span style="left:${((m - ini) / tot * 100).toFixed(3)}%">${String(m / 60).padStart(2, '0')}</span>`).join('')}</div></div>`;
-  for (const e of B.espacos) {
-    const its = itens.filter(r => r.espaco_id === e.id);
-    h += `<div class="lt-linha"><span class="lt-nome">${numeroBadge(e)}<span>${esc(e.nome)}</span></span><div class="lt-pista" data-pista="${esc(e.id)}" title="Toque num espaço livre para marcar">`;
-    for (let m = ini; m < fim; m += 60) h += `<i class="lt-h" style="left:${((m - ini) / tot * 100).toFixed(3)}%"></i>`;
-    if (e.abreMin > ini) h += `<i class="lt-fora" style="left:0;width:${((e.abreMin - ini) / tot * 100).toFixed(3)}%"></i>`;
-    if (e.fechaMin < fim) h += `<i class="lt-fora" style="left:${((e.fechaMin - ini) / tot * 100).toFixed(3)}%;right:0"></i>`;
-    if (agoraP > 0) h += `<i class="lt-passado" style="width:${agoraP.toFixed(3)}%"></i>`;
-    for (const r of its) {
-      const a = pos(new Date(r.inicio).getTime()), b = pos(new Date(r.fim).getTime()), x = extra(r);
-      h += `<button type="button" class="lt-b t-${r.tipo}${usoAtivo(r) && new Date(r.fim) <= Date.now() ? ' atraso' : ''}" data-item="${r.id}" style="left:${a.toFixed(3)}%;width:${(b - a).toFixed(3)}%" title="${esc(`${hora(r.inicio)}–${hora(r.fim)} · ${rotulo(r)}${x ? ' · ' + x : ''}`)}"><b>${esc(rotulo(r))}</b><small>${hora(r.inicio)}–${hora(r.fim)}${x ? ' · ' + esc(x) : ''}</small></button>`;
-    }
-    if (dia === hoje() && agoraP > 0 && agoraP < 100) h += `<i class="lt-agora" style="left:${agoraP.toFixed(3)}%"></i>`;
-    h += '</div></div>';
-  }
-  return h + `</div><div class="legenda small"><span><i class="lg uso"></i>Reserva</span><span><i class="lg tor"></i>Torneio</span><span><i class="lg blq"></i>Bloqueio</span><span><i class="lg atraso"></i>Material por devolver</span><span><i class="lt-agora-lg"></i>Agora</span></div>`;
-}
+const legendaLT = '<span><i class="lg uso"></i>Reserva</span><span><i class="lg tor"></i>Torneio</span><span><i class="lg blq"></i>Bloqueio</span><span><i class="lg atraso"></i>Material por devolver</span><span><i class="lt-agora-lg"></i>Agora</span>';
+const linhaDia = () => linhaTempo({ espacos: B.espacos, dia, itens, rotulo,
+  detalhe: r => `${hora(r.inicio)}–${hora(r.fim)}${extra(r) ? ' · ' + extra(r) : ''}`,
+  cls: r => usoAtivo(r) && new Date(r.fim) <= Date.now() ? 'atraso' : '', legenda: legendaLT });
 
 /* ---------- nova reserva / bloqueio ---------- */
 function novo(espId, min) {
