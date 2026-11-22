@@ -1,15 +1,29 @@
 // Router: #/ (reservar) · #/r/<token> (reserva) · #/rececao · #/torneio/<id> · #/tv · #/tv/torneio[/<id>]
-import { paginaReservar, paginaReserva } from './hospede.js?v=26';
-import { paginaRececao } from './rececao.js?v=26';
-import { paginaTV, pararTV } from './tv.js?v=26';
-import { paginaTorneio, paginaTVTorneio, pararTorneio } from './torneio.js?v=26';
-import { pararAuto, ocupado } from './core.js?v=26';
-import { pararRececao } from './rececao.js?v=26';
+import { paginaReservar, paginaReserva } from './hospede.js?v=27';
+import { paginaRececao } from './rececao.js?v=27';
+import { paginaTV, pararTV } from './tv.js?v=27';
+import { paginaTorneio, paginaTVTorneio, pararTorneio } from './torneio.js?v=27';
+import { pararAuto, ocupado } from './core.js?v=27';
+import { pararRececao } from './rececao.js?v=27';
 
 const app = document.getElementById('app');
+// App instalada (Chrome/Edge no Mac, ecrã principal): a da receção abre no painel.
+// Uma app instalada antes desta correção abria na página dos hóspedes: com sessão iniciada vai para o painel.
+const instalada = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+if (instalada && !location.hash.replace(/^#\/?/, '')) {
+  try { if (Object.keys(localStorage).some(k => /^sb-.*-auth-token$/.test(k))) location.replace('#/rececao'); } catch { /* sem armazenamento */ }
+}
+// Manifesto da app consoante a página: painel da receção / torneios / TV abrem no painel; a página dos hóspedes abre nas reservas
+function manifesto(h) {
+  const el = document.querySelector('link[rel="manifest"]'); if (!el) return;
+  const staff = /^(rececao|torneio\/|tv)/.test(h);
+  const href = staff ? 'manifest.webmanifest' : 'manifest-hospedes.webmanifest';
+  if (el.getAttribute('href') !== href) el.setAttribute('href', href);
+}
 function rota() {
   document.getElementById('modal').innerHTML = '';
   const h = location.hash.replace(/^#\/?/, '');
+  manifesto(h);
   pararTV(); pararTorneio(); pararAuto(); pararRececao();
   if (h.startsWith('r/')) return paginaReserva(app, decodeURIComponent(h.slice(2)));
   if (h === 'rececao') return paginaRececao(app);
