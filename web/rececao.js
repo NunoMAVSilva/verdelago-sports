@@ -1,8 +1,8 @@
 // Painel da receção (#/rececao): login, grelha do dia, reservas/bloqueios, torneios, cacifos.
-import { planta, numeroBadge } from './planta.js?v=24';
-import { linhaTempo, limitesDia } from './linhatempo.js?v=24';
-import { novaSaida, alterarSaida, devolverSaida, pendente, avisoCheckout } from './saida.js?v=24';
-import { sb, $, $$, esc, autoAtualizar, normQuarto, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, carregarBase, erroTexto, toast, dialogo, confirmar, grelha, LOGO, ocupado } from './core.js?v=24';
+import { planta, numeroBadge } from './planta.js?v=25';
+import { linhaTempo, limitesDia } from './linhatempo.js?v=25';
+import { novaSaida, alterarSaida, devolverSaida, pendente, avisoCheckout } from './saida.js?v=25';
+import { sb, $, $$, esc, autoAtualizar, normQuarto, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, carregarBase, erroTexto, toast, dialogo, confirmar, grelha, LOGO, ocupado } from './core.js?v=25';
 
 let ultImport = null, B = null, dia = hoje(), aba = 'campos', filtro = '', selCampo = null, materialFora = [], checkouts = {}, itens = [], cacifos = [], usosAtivos = [], porPreparar = [], naoDevolvidos = [], torneios = [], app = null, staffNome = '';
 
@@ -202,7 +202,7 @@ function postits(agora) {
   materialFora.forEach(x => { const d = x.doc;
     fora.push({ tipo: 'balcao', id: x.id, quarto: d.quarto, checkout: checkouts[d.quarto] || d.checkout, ate: d.prevista, desde: d.saida,
       linhas: pendente(d).map(i => `<b>${i.qtd}×</b> ${esc(i.nome)}${(i.nums || []).length ? ` <span class="nb">${i.nums.map(n => `<span>${n}</span>`).join('')}</span>` : ''}`),
-      meta: `Balcão · saiu ${hora(d.saida)}${d.colabEntregou ? ' · ' + esc(d.colabEntregou.split(' ')[0]) : ''}${(d.devolucoes || []).length ? ' · <b>devolução parcial</b>' : ''}${(d.alteracoes || []).length ? ' · alterado' : ''}${d.assinatura ? ' · ✓ assinado' : d.assinaturaRecusada ? ' · sem assinatura' : ''}` }); });
+      meta: `Balcão · saiu ${hora(d.saida)}${d.campo?.nome ? ' · ' + esc(d.campo.nome) : ''}${d.colabEntregou ? ' · ' + esc(d.colabEntregou.split(' ')[0]) : ''}${(d.devolucoes || []).length ? ' · <b>devolução parcial</b>' : ''}${(d.alteracoes || []).length ? ' · alterado' : ''}${d.assinatura ? ' · ✓ assinado' : d.assinaturaRecusada ? ' · sem assinatura' : ''}` }); });
   const sev = f => !f.ate ? 'ok' : t > f.ate ? 'bad' : f.ate - t < 30 * 60e3 ? 'warn' : 'ok';
   const ordem = { bad: 0, warn: 1, ok: 2 };
   fora.sort((a, b) => ordem[sev(a)] - ordem[sev(b)] || (a.ate || 0) - (b.ate || 0));

@@ -1,7 +1,7 @@
 // Dia inteiro em linha do tempo: uma pista por campo, blocos com as marcações e linha vermelha na hora atual.
 // Usada na Grelha do dia da receção (interativa) e no ecrã TV (só leitura).
-import { esc, lisboa, hoje } from './core.js?v=24';
-import { numeroBadge } from './planta.js?v=24';
+import { esc, lisboa, hoje } from './core.js?v=25';
+import { numeroBadge } from './planta.js?v=25';
 
 export const limitesDia = espacos => ({ ini: Math.min(...espacos.map(e => e.abreMin)), fim: Math.max(...espacos.map(e => e.fechaMin)) });
 

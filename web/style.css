@@ -428,3 +428,11 @@ body.tv .legenda{font-size:clamp(12px,.95vw,20px);color:var(--muted)}
 .dv-num small{font-weight:600;font-size:11px}
 .dv-num.Danificada{background:#fff1d6;color:#8a5a00}.dv-num.Perdida{background:#fbeceb;color:#8c1d17}.dv-num.Fora{background:#eee;color:#555}
 .sd-nums:has(.dv-num){grid-template-columns:repeat(auto-fill,minmax(96px,1fr))}
+
+/* nova saída: associar campo */
+.cp-grelha{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}
+.cp{font:inherit;display:flex;gap:10px;align-items:center;text-align:left;padding:10px 12px;border-radius:10px;border:2px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.cp span{display:flex;flex-direction:column}.cp small{color:var(--muted);font-size:12px}
+.cp .pn{width:28px;height:28px;font-size:15px;flex:none}
+.cp[aria-pressed="true"]{border-color:#0d6b52;background:#e6f2ec}
+.cp:disabled{opacity:.5;cursor:not-allowed;background:var(--soft)}
