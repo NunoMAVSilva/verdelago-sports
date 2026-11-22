@@ -1,6 +1,6 @@
 // Ecrã TV (#/tv): ocupação de hoje em todos os espaços em linha do tempo (como a grelha do dia), atualiza de 20 em 20 s.
-import { sb, $, esc, hoje, hora, dataLonga, carregarBase, erroTexto, LOGO, autoAtualizar } from './core.js?v=23';
-import { linhaTempo } from './linhatempo.js?v=23';
+import { sb, $, esc, hoje, hora, dataLonga, carregarBase, erroTexto, LOGO, autoAtualizar } from './core.js?v=24';
+import { linhaTempo } from './linhatempo.js?v=24';
 
 let timers = [];
 export function pararTV() { timers.forEach(clearInterval); timers = []; document.body.classList.remove('tv'); }

@@ -449,7 +449,7 @@ const DEFAULT_CFG={
     {id:"div-col-am",mod:"Material Diverso",nome:"Coletes Amarelos",total:12,min:5,num:false}
   ]
 };
-const S={cfg:clone(DEFAULT_CFG),avarias:{},hist:new Map(),act:new Map(),db:null,dl:null,tab:"balcao",
+const S={cfg:clone(DEFAULT_CFG),avarias:{},hist:new Map(),act:new Map(),db:null,dl:null,tab:"material",
   form:{tipo:"Guest",open:[],cesto:{},colab:"",prazo:"auto"},aPer:"30"};
 function clone(o){return JSON.parse(JSON.stringify(o))}
 function lsGet(k){try{return localStorage.getItem("mat_"+k)}catch(e){return null}}
@@ -961,7 +961,7 @@ $("#dImp").addEventListener("change",async e=>{const f=e.target.files[0];e.targe
    recebem-nas pelo Realtime (e, por segurança, a cada minuto e ao voltar ao separador). */
 const SB_URL="https://ncisfqhfxqumoadikupm.supabase.co";
 const SB_KEY="sb_publishable_waNo5245APdUQsax_Kmyrg_fRj4lrMs"; /* chave pública (publishable): a segurança está nas regras RLS */
-const FASE_OCULTAR=["analise","relatorio"]; /* fase 1: Balcão, Material e Histórico (+ Definições para gestores) */
+const FASE_OCULTAR=["balcao","analise","relatorio"]; /* o Balcão passou para o painel da receção (Home) */ /* fase 1: Balcão, Material e Histórico (+ Definições para gestores) */
 let sb=null,canal=null,tCarga=null;
 const novoId=()=>(window.crypto&&crypto.randomUUID)?crypto.randomUUID():"l"+Date.now().toString(36)+Math.random().toString(36).slice(2);
 function chk(r){if(r&&r.error)throw r.error;return r}
@@ -1004,7 +1004,7 @@ function erroLogin(x){const t=String((x&&(x.code||""))+" "+(x&&x.message||"")+" 
   if(/429|rate|too many|over_request/i.test(t))return "Demasiadas tentativas. Espere alguns minutos.";
   if(/fetch|network/i.test(t))return "Sem ligação à internet.";
   return "Não foi possível entrar."}
-(async function boot(){const t=lsGet("tab");setTab(["balcao","material","historico","defs"].includes(t)?t:"balcao");tick();
+(async function boot(){const t=lsGet("tab");setTab(["material","historico","defs"].includes(t)?t:"material");tick();
   S.dl={save:async({filename,data})=>{const type=/\.html$/.test(filename)?"text/html":/\.json$/.test(filename)?"application/json":"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     const blob=data instanceof Blob?data:new Blob([data],{type});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=filename;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000)}};
   FASE_OCULTAR.forEach(k=>{const b=document.querySelector(`#tabs [data-tab="${k}"]`);if(b)b.hidden=true});
@@ -1038,7 +1038,7 @@ function erroLogin(x){const t=String((x&&(x.code||""))+" "+(x&&x.message||"")+" 
     S.admin=st.papel==="gestor";S.userName=st.nome||u.email;
     $("#whoT").textContent=S.userName+(S.admin?" · gestor":"");
     {const po=POSTOS.find(p=>p.email===u.email);const hide=new Set([...FASE_OCULTAR,...(S.admin?[]:["defs"]),...((!S.admin&&po&&po.ocultar)||[])]);
-     document.querySelectorAll("#tabs [data-tab]").forEach(b=>b.hidden=hide.has(b.dataset.tab));if(hide.has(S.tab))setTab("balcao")}
+     document.querySelectorAll("#tabs [data-tab]").forEach(b=>b.hidden=hide.has(b.dataset.tab));if(hide.has(S.tab))setTab("material")}
     $("#dImpBtn").hidden=!S.admin;
     S.importAll=S.admin?async j=>{
       const rows=Object.entries(j.emprestimos||{}).map(([id,doc])=>({id,doc}));

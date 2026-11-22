@@ -1,10 +1,10 @@
 // Painel da receção (#/rececao): login, grelha do dia, reservas/bloqueios, torneios, cacifos.
-import { planta, numeroBadge } from './planta.js?v=23';
-import { linhaTempo, limitesDia } from './linhatempo.js?v=23';
-import { novaSaida } from './saida.js?v=23';
-import { sb, $, $$, esc, autoAtualizar, normQuarto, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, carregarBase, erroTexto, toast, dialogo, confirmar, grelha, LOGO, ocupado } from './core.js?v=23';
+import { planta, numeroBadge } from './planta.js?v=24';
+import { linhaTempo, limitesDia } from './linhatempo.js?v=24';
+import { novaSaida, alterarSaida, devolverSaida, pendente, avisoCheckout } from './saida.js?v=24';
+import { sb, $, $$, esc, autoAtualizar, normQuarto, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, carregarBase, erroTexto, toast, dialogo, confirmar, grelha, LOGO, ocupado } from './core.js?v=24';
 
-let ultImport = null, B = null, dia = hoje(), aba = 'campos', filtro = '', selCampo = null, materialFora = [], itens = [], cacifos = [], usosAtivos = [], porPreparar = [], naoDevolvidos = [], torneios = [], app = null, staffNome = '';
+let ultImport = null, B = null, dia = hoje(), aba = 'campos', filtro = '', selCampo = null, materialFora = [], checkouts = {}, itens = [], cacifos = [], usosAtivos = [], porPreparar = [], naoDevolvidos = [], torneios = [], app = null, staffNome = '';
 
 export async function paginaRececao(el) {
   app = el;
@@ -65,6 +65,14 @@ async function recarregar(manter = false) {
   ]);
   ultImport = imp.data || null;
   materialFora = mf.error ? [] : mf.data; // empréstimos do balcão de material (página Material desportivo)
+  // check-out previsto dos quartos com material fora (para cobrar o que não for devolvido a tempo)
+  const quartos = [...new Set([...materialFora.map(x => x.doc.quarto), ...(u.data || []).map(x => x.reservas?.quarto)].filter(Boolean))];
+  checkouts = {};
+  if (quartos.length) {
+    const { data: es } = await sb.from('estadias').select('quarto, chegada, partida').in('quarto', quartos).gte('partida', addDias(hoje(), -7)).order('chegada');
+    const h = hoje();
+    (es || []).forEach(e => { const atual = e.chegada <= h && e.partida >= h; if (atual || !checkouts[e.quarto]) checkouts[e.quarto] = e.partida; });
+  }
   const err = r.error || c.error || u.error || p.error || t.error || nd.error;
   if (err) { toast(erroTexto(err), 'erro'); return; }
   itens = r.data; cacifos = c.data; usosAtivos = u.data; torneios = t.data; naoDevolvidos = nd.data;
@@ -189,12 +197,12 @@ const minutos = ms => { const m = Math.max(0, Math.round(ms / 60000)); return m 
 function postits(agora) {
   const t = agora.getTime(), fora = [];
   usosAtivos.forEach(u => { const r = u.reservas; if (!r) return;
-    fora.push({ tipo: 'cacifo', id: u.id, quarto: r.quarto, ate: new Date(r.fim).getTime(), desde: new Date(r.inicio).getTime(),
+    fora.push({ tipo: 'cacifo', id: u.id, quarto: r.quarto, checkout: checkouts[r.quarto], ate: new Date(r.fim).getTime(), desde: new Date(r.inicio).getTime(),
       linhas: [esc(u.material || 'Material no cacifo')], meta: `${esc(nomeEsp(r.espaco_id))} · cacifo ${u.cacifo_id} · código ${esc(u.codigo)}` }); });
   materialFora.forEach(x => { const d = x.doc;
-    fora.push({ tipo: 'balcao', id: x.id, quarto: d.quarto, ate: d.prevista, desde: d.saida,
-      linhas: (d.itens || []).map(i => `<b>${i.qtd}×</b> ${esc(i.nome)}${(i.nums || []).length ? ` <span class="nb">${i.nums.map(n => `<span>${n}</span>`).join('')}</span>` : ''}`),
-      meta: `Balcão · saiu ${hora(d.saida)}${d.colabEntregou ? ' · ' + esc(d.colabEntregou.split(' ')[0]) : ''}` }); });
+    fora.push({ tipo: 'balcao', id: x.id, quarto: d.quarto, checkout: checkouts[d.quarto] || d.checkout, ate: d.prevista, desde: d.saida,
+      linhas: pendente(d).map(i => `<b>${i.qtd}×</b> ${esc(i.nome)}${(i.nums || []).length ? ` <span class="nb">${i.nums.map(n => `<span>${n}</span>`).join('')}</span>` : ''}`),
+      meta: `Balcão · saiu ${hora(d.saida)}${d.colabEntregou ? ' · ' + esc(d.colabEntregou.split(' ')[0]) : ''}${(d.devolucoes || []).length ? ' · <b>devolução parcial</b>' : ''}${(d.alteracoes || []).length ? ' · alterado' : ''}${d.assinatura ? ' · ✓ assinado' : d.assinaturaRecusada ? ' · sem assinatura' : ''}` }); });
   const sev = f => !f.ate ? 'ok' : t > f.ate ? 'bad' : f.ate - t < 30 * 60e3 ? 'warn' : 'ok';
   const ordem = { bad: 0, warn: 1, ok: 2 };
   fora.sort((a, b) => ordem[sev(a)] - ordem[sev(b)] || (a.ate || 0) - (b.ate || 0));
@@ -202,9 +210,11 @@ function postits(agora) {
   return `<section class="card stack"><div class="row between"><h2>Material em utilização</h2><span class="row">${fora.length ? `<span class="chip">${fora.length} registo${fora.length > 1 ? 's' : ''}</span>` : ''}${nAtr ? `<span class="chip est-atraso">${nAtr} em atraso</span>` : ''}<button class="btn small" id="b-saida">+ Nova saída</button></span></div>
     ${fora.length ? '' : '<p class="muted" style="margin:0">Sem material em utilização.</p>'}<div class="postits">${fora.map(f => { const s = sev(f);
       const pill = s === 'bad' ? `Atraso ${minutos(t - f.ate)}` : s === 'warn' ? `Faltam ${minutos(f.ate - t)}` : f.ate ? `Até ${hora(f.ate)}` : '';
+      const co = avisoCheckout(f.checkout);
       return `<article class="postit ${s}"><div class="r1"><span class="room">${esc(f.quarto)}</span>${pill ? `<span class="pill ${s}">${pill}</span>` : ''}</div>
+        ${co ? `<div class="co ${co.cls}">🧳 ${esc(co.txt)}${co.cls === 'bad' ? ' · cobrar se não devolver' : ''}</div>` : ''}
         <div class="mat">${f.linhas.map(l => `<div>${l}</div>`).join('')}</div><div class="meta">${f.meta}</div>
-        <div class="acts">${f.tipo === 'cacifo' ? `<button class="btn small" data-dev-cac="${f.id}">Devolvido</button><button class="btn ghost danger small" data-nd-cac="${f.id}">Não devolvido</button>` : '<a class="btn small" href="#/rececao" data-aba="material">Devolver no balcão</a>'}</div></article>`; }).join('')}</div></section>`;
+        <div class="acts">${f.tipo === 'cacifo' ? `<button class="btn small" data-dev-cac="${f.id}">Devolvido</button><button class="btn ghost danger small" data-nd-cac="${f.id}">Não devolvido</button>` : `<button class="btn small" data-dev-emp="${f.id}">Devolvido</button><button class="btn ghost small" data-alt-emp="${f.id}">Alterar</button>`}</div></article>`; }).join('')}</div></section>`;
 }
 function vCampos() {
   const agora = agoraD(), sel = B.espacos.find(e => e.id === selCampo);
@@ -231,6 +241,9 @@ function vCampos() {
 }
 function ligarCampos() {
   const bs = $('#b-saida'); if (bs) bs.onclick = abrirSaida;
+  const aposMaterial = () => recarregar(true);
+  $$('[data-dev-emp]').forEach(b => b.onclick = () => devolverSaida(b.dataset.devEmp, { por: staffNome, depois: aposMaterial }));
+  $$('[data-alt-emp]').forEach(b => b.onclick = () => alterarSaida(b.dataset.altEmp, { por: staffNome, depois: aposMaterial }));
   $$('[data-campo]').forEach(b => b.onclick = () => { selCampo = selCampo === b.dataset.campo ? null : b.dataset.campo; desenhar(); });
   $$('.campos-lado [data-item]').forEach(b => b.onclick = () => detalhe(itens.find(r => r.id === b.dataset.item)));
   const f = $('[data-fechar-campo]'); if (f) f.onclick = () => { selCampo = null; desenhar(); };
