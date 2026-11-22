@@ -2,7 +2,7 @@
 // Vem da app "Torneios de Pádel Verdelago" (artefacto). O estado fica em torneios.dados;
 // nome, dias, hora de início e campos são os do torneio (que bloqueia os campos na grelha).
 // #/torneio/<id> (staff) · #/tv/torneio[/<id>] (público, via torneio_tv)
-import { sb, $, esc, hora, dataLonga, carregarBase, erroTexto, toast, confirmar, LOGO } from './core.js?v=22';
+import { sb, $, esc, hora, dataLonga, carregarBase, erroTexto, toast, confirmar, LOGO } from './core.js?v=23';
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const LETRAS = 'ABCDEFGHIJKLMNOP';
@@ -447,7 +447,7 @@ function vQuadro() {
 /* ---------- ações (staff) ---------- */
 const ACTS = {
   async editarBloq() {
-    const { editarTorneio } = await import('./rececao.js?v=22');
+    const { editarTorneio } = await import('./rececao.js?v=23');
     editarTorneio(R, B, async () => { if (await carregar(R.id)) render(); });
   },
   async estenderBloq() {
