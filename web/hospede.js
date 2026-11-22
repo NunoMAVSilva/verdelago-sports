@@ -1,5 +1,5 @@
 // Páginas do hóspede: reservar (#/) e ver/cancelar reserva (#/r/<token>). PT/EN.
-import { sb, $, esc, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, MODALIDADES, nomeMod, carregarBase, erroTexto, toast, confirmar, LOGO, autoAtualizar, ocupado } from './core.js?v=23';
+import { sb, $, esc, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, MODALIDADES, nomeMod, carregarBase, erroTexto, toast, confirmar, LOGO, autoAtualizar, ocupado } from './core.js?v=24';
 
 const TXT = {
   pt: {
