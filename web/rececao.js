@@ -1,8 +1,8 @@
 // Painel da receção (#/rececao): login, grelha do dia, reservas/bloqueios, torneios, cacifos.
-import { planta, numeroBadge } from './planta.js?v=25';
-import { linhaTempo, limitesDia } from './linhatempo.js?v=25';
-import { novaSaida, alterarSaida, devolverSaida, pendente, avisoCheckout } from './saida.js?v=25';
-import { sb, $, $$, esc, autoAtualizar, normQuarto, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, carregarBase, erroTexto, toast, dialogo, confirmar, grelha, LOGO, ocupado } from './core.js?v=25';
+import { planta, numeroBadge } from './planta.js?v=26';
+import { linhaTempo, limitesDia } from './linhatempo.js?v=26';
+import { novaSaida, alterarSaida, devolverSaida, pendente, avisoCheckout, htmlSeletor, seletorCacifo, emprestimoCacifo, fecharEmprestimoCacifo } from './saida.js?v=26';
+import { sb, $, $$, esc, autoAtualizar, normQuarto, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, carregarBase, erroTexto, toast, dialogo, confirmar, grelha, LOGO, ocupado } from './core.js?v=26';
 
 let ultImport = null, B = null, dia = hoje(), aba = 'campos', filtro = '', selCampo = null, materialFora = [], checkouts = {}, itens = [], cacifos = [], usosAtivos = [], porPreparar = [], naoDevolvidos = [], torneios = [], app = null, staffNome = '';
 
@@ -64,7 +64,7 @@ async function recarregar(manter = false) {
     sb.from('cacifo_usos').select('*, reservas(id, espaco_id, inicio, quarto, apelido, nome, telefone, email)').eq('estado', 'nao_devolvido').gt('nao_devolvido_em', lisboa(addDias(hoje(), -30), 0).toISOString()).order('nao_devolvido_em', { ascending: false }),
   ]);
   ultImport = imp.data || null;
-  materialFora = mf.error ? [] : mf.data; // empréstimos do balcão de material (página Material desportivo)
+  materialFora = mf.error ? [] : mf.data.filter(x => !x.doc.cacifo); // empréstimos do balcão (os dos cacifos aparecem no post-it do cacifo)
   // check-out previsto dos quartos com material fora (para cobrar o que não for devolvido a tempo)
   const quartos = [...new Set([...materialFora.map(x => x.doc.quarto), ...(u.data || []).map(x => x.reservas?.quarto)].filter(Boolean))];
   checkouts = {};
@@ -250,6 +250,7 @@ function ligarCampos() {
   $$('[data-dev-cac]').forEach(b => b.onclick = async () => {
     const { error } = await sb.from('cacifo_usos').update({ estado: 'devolvido', devolvido_em: new Date().toISOString() }).eq('id', b.dataset.devCac);
     if (error) { toast(erroTexto(error), 'erro'); return; }
+    await fecharEmprestimoCacifo(b.dataset.devCac, 'devolvido', staffNome);
     toast('Material devolvido. Mude o código do cacifo.'); recarregar();
   });
   $$('[data-nd-cac]').forEach(b => b.onclick = () => { const u = usosAtivos.find(x => x.id === b.dataset.ndCac); if (u) naoDevolvido(u, u.reservas); });
@@ -379,8 +380,10 @@ function detalhe(r) {
           <div class="fgrid">
             <label class="f" for="c-num">Cacifo<select id="c-num" name="num" required>${livres.map(c => `<option value="${c.id}">${c.id}${c.tamanho === 'grande' ? ' (grande)' : ''}</option>`).join('') || '<option value="">Nenhum livre</option>'}</select></label>
             <label class="f" for="c-cod">Código definido<div class="row nowrap"><input id="c-cod" name="cod" required pattern="[0-9]{3,8}" inputmode="numeric" maxlength="8" style="width:100%"><button type="button" class="btn ghost small" id="c-gerar" title="Sugerir código">🎲</button></div></label>
-            <label class="f wide" for="c-mat">Material deixado<input id="c-mat" name="mat" placeholder="Ex.: 4 raquetes + 1 tubo de bolas"></label>
           </div>
+          <div class="stack cx-mat" id="c-sel"><p class="muted small" style="margin:0">A carregar o material…</p></div>
+          <label class="f" for="c-mat">Outro material (opcional)<input id="c-mat" name="mat" placeholder="Material que não está na lista"></label>
+          <div class="err" id="sd-err" role="alert"></div>
           <div class="row end"><button class="btn small" ${livres.length ? '' : 'disabled'}>Guardar cacifo</button></div>
         </form>`}
       <div class="row">
@@ -397,7 +400,7 @@ function detalhe(r) {
         if (k === 'cancelar') {
           if (!await confirmar(res ? `Cancelar a reserva do quarto ${r.quarto}?` : 'Remover este bloqueio?', res ? 'Cancelar reserva' : 'Remover', true)) return;
           const { error } = await sb.from('reservas').update({ estado: 'cancelada', cancelado_em: new Date().toISOString() }).eq('id', r.id);
-          if (!error && u) await sb.from('cacifo_usos').update({ estado: 'cancelado' }).eq('id', u.id);
+          if (!error && u) { await sb.from('cacifo_usos').update({ estado: 'cancelado' }).eq('id', u.id); await fecharEmprestimoCacifo(u.id, 'cancelado'); }
           if (error) { toast(erroTexto(error), 'erro'); return; }
           toast(res ? 'Reserva cancelada' : 'Bloqueio removido'); recarregar(); return;
         }
@@ -406,19 +409,29 @@ function detalhe(r) {
           const upd = k === 'devolvido' ? { estado: 'devolvido', devolvido_em: new Date().toISOString() } : { estado: 'cancelado' };
           const { error } = await sb.from('cacifo_usos').update(upd).eq('id', u.id);
           if (error) { toast(erroTexto(error), 'erro'); return; }
+          await fecharEmprestimoCacifo(u.id, k === 'devolvido' ? 'devolvido' : 'cancelado', staffNome);
           fechar(); toast(k === 'devolvido' ? `Cacifo ${u.cacifo_id} livre. Lembre-se de mudar o código.` : 'Cacifo libertado'); recarregar();
         }
       };
       dlg.querySelectorAll('[data-acao]').forEach(b => b.onclick = () => acao(b.dataset.acao));
       const fc = dlg.querySelector('#f-cacifo');
+      let selMat = null;
       if (fc) {
+        dlg.classList.add('dlg-largo');
+        const cs = dlg.querySelector('#c-sel'); cs.innerHTML = htmlSeletor;
+        seletorCacifo(dlg, B.espacos.find(e => e.id === r.espaco_id)?.modalidade).then(x => { selMat = x; }).catch(e => { cs.innerHTML = `<p class="small" style="color:var(--bad);margin:0">Não foi possível carregar a lista de material (${esc(erroTexto(e))}). Escreva o material em "Outro material".</p>`; });
         dlg.querySelector('#c-gerar').onclick = () => { fc.elements.cod.value = String(Math.floor(Math.random() * 10000)).padStart(4, '0'); };
         fc.onsubmit = async ev => {
           ev.preventDefault();
-          const el = fc.elements;
+          const el = fc.elements, erro = t => { dlg.querySelector('#sd-err').textContent = t || ''; };
+          const lista = selMat && !selMat.vazio() ? selMat.itens() : [];
+          if (!lista.length && !el.mat.value.trim()) { erro('Escolha o material que fica no cacifo.'); return; }
+          const c = selMat?.conflito(); if (c) { erro(c); return; }
+          const material = [lista.length ? selMat.texto() : '', el.mat.value.trim()].filter(Boolean).join(' + ');
           const { data: { user } } = await sb.auth.getUser();
-          const { error } = await sb.from('cacifo_usos').insert({ cacifo_id: +el.num.value, reserva_id: r.id, codigo: el.cod.value.trim(), material: el.mat.value.trim() || null, preparado_por: user?.id || null });
+          const { data: uso, error } = await sb.from('cacifo_usos').insert({ cacifo_id: +el.num.value, reserva_id: r.id, codigo: el.cod.value.trim(), material, preparado_por: user?.id || null }).select('id, cacifo_id').single();
           if (error) { toast(/cacifo_ocupado/.test(error.message) ? 'Esse cacifo já está ocupado.' : erroTexto(error), 'erro'); return; }
+          if (lista.length) { const e2 = (await emprestimoCacifo({ uso, reserva: r, itens: lista, entregou: staffNome })).error; if (e2) toast('Cacifo guardado, mas o material não ficou registado no inventário: ' + erroTexto(e2), 'erro'); }
           toast(`Cacifo ${el.num.value} associado. O hóspede já vê o código na reserva.`);
           await recarregar();
           detalhe(itens.find(x => x.id === r.id) || porPreparar.find(x => x.id === r.id) || r);
@@ -533,11 +546,13 @@ function ligarCacifos() {
     if (!await confirmar('Marcar como devolvido? Avise também a receção do resort de que já não há nada a cobrar.', 'Foi devolvido', false)) return;
     const { error } = await sb.from('cacifo_usos').update({ estado: 'devolvido', devolvido_em: new Date().toISOString() }).eq('id', b.dataset.afinal);
     if (error) { toast(erroTexto(error), 'erro'); return; }
+    await fecharEmprestimoCacifo(b.dataset.afinal, 'devolvido', staffNome);
     toast('Marcado como devolvido.'); recarregar();
   });
   $$('[data-dev]').forEach(b => b.onclick = async () => {
     const { error } = await sb.from('cacifo_usos').update({ estado: 'devolvido', devolvido_em: new Date().toISOString() }).eq('id', b.dataset.dev);
     if (error) { toast(erroTexto(error), 'erro'); return; }
+    await fecharEmprestimoCacifo(b.dataset.dev, 'devolvido', staffNome);
     toast('Cacifo livre. Lembre-se de mudar o código.'); recarregar();
   });
 }

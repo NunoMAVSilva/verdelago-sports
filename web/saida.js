@@ -6,8 +6,8 @@
 // Guest/Proprietário e o check-out previsto vêm da lista de hóspedes (estadias); quem entrega/recebe/altera
 // é a pessoa com sessão iniciada. O email e a assinatura são apagados depois do check-out se a devolução
 // correu bem (função limpar_termos_material, migração 0011).
-import { sb, $, esc, hora, lisboa, hoje, addDias, dataCurta, normQuarto, dialogo, toast, erroTexto, carregarBase } from './core.js?v=25';
-import { numeroBadge } from './planta.js?v=25';
+import { sb, $, esc, hora, lisboa, hoje, addDias, dataCurta, normQuarto, dialogo, toast, erroTexto, carregarBase } from './core.js?v=26';
+import { numeroBadge } from './planta.js?v=26';
 
 // Igual ao DEFAULT_CFG da página Material (usado enquanto não houver "main" em material_config)
 const MODS = ['Padel', 'Ténis', 'Futebol', 'Futsal', 'Basquetebol', 'Voleibol', 'Material Diverso'];
@@ -133,7 +133,44 @@ function seletor(d, M, F, { mods = MODS, ignorar = null, aoMudar = () => {} } = 
   return { conflito: () => { for (const id of Object.keys(F.cesto)) for (const n of F.cesto[id].nums) { const o = ocupada(id + ':' + n); if (o) return `A raquete n.º ${n} (${M.item(id).nome}) já está fora com o quarto ${o.quarto}.`; } return ''; } };
 }
 const itensDoc = (M, F) => Object.keys(F.cesto).map(id => { const i = M.item(id) || { nome: id, mod: '' }, x = F.cesto[id]; return { id, nome: i.nome, mod: i.mod, qtd: qtd(x), nums: x.nums.slice() }; });
-const htmlSeletor = `<div><div class="sd-lbl">Modalidades · pode abrir várias</div><div class="sd-mods" id="sd-mods"></div></div><div id="sd-itens" class="sd-itens"></div><div id="sd-cesto" class="sd-cesto" hidden></div>`;
+export const htmlSeletor = `<div><div class="sd-lbl">Modalidades · pode abrir várias</div><div class="sd-mods" id="sd-mods"></div></div><div id="sd-itens" class="sd-itens"></div><div id="sd-cesto" class="sd-cesto" hidden></div>`;
+
+/* ---------------- cacifos: o material deixado no cacifo também é um empréstimo ---------------- */
+// Modalidades de material de cada tipo de campo (abertas por defeito; "Diverso" fica sempre disponível)
+const ESP_MOD = { padel: ['Padel'], tenis: ['Ténis'], futebol: ['Futebol', 'Futsal'], 'beach-volley': ['Voleibol'], polidesportivo: ['Basquetebol', 'Futsal', 'Futebol'] };
+export async function seletorCacifo(d, modalidadeEsp) {
+  const M = await carregar();
+  const base = ESP_MOD[modalidadeEsp] || MODS;
+  const mods = [...new Set([...base, 'Material Diverso'])];
+  const F = { abertas: base.slice(), cesto: {} };
+  const sel = seletor(d, M, F, { mods });
+  const itens = () => itensDoc(M, F);
+  return { vazio: () => !Object.keys(F.cesto).length, conflito: sel.conflito, itens,
+    texto: () => itens().map(i => `${i.qtd}× ${i.nome}${i.nums.length ? ' (nº ' + i.nums.join(', ') + ')' : ''}`).join(', ') };
+}
+// Regista o material do cacifo em `emprestimos` (fica "fora" no inventário até o cacifo ser devolvido)
+export async function emprestimoCacifo({ uso, reserva, itens, entregou = '' }) {
+  const e = await estadiaDe(reserva.quarto), agora = Date.now();
+  const doc = { dia: diaLx(agora), saida: agora, quarto: reserva.quarto, tipo: e?.proprietario ? 'Proprietário' : 'Guest', checkout: e?.partida || null,
+    modalidades: [...new Set(itens.map(i => i.mod))], itens, prevista: new Date(reserva.fim).getTime(), colabEntregou: entregou, posto: entregou,
+    obs: `Cacifo ${uso.cacifo_id}`, estado: 'fora', devolvido: null, colabRecebeu: '', incidentes: [], res: {}, devolucoes: [], alteracoes: [],
+    cacifo: { uso_id: uso.id, cacifo_id: uso.cacifo_id, reserva_id: reserva.id } };
+  return sb.from('emprestimos').insert({ id: novoId(), doc });
+}
+// Cacifo devolvido: fecha o empréstimo (tudo devolvido). Cacifo retirado/cancelado: o material não chegou a sair.
+export async function fecharEmprestimoCacifo(usoId, como = 'devolvido', por = '') {
+  const { data, error } = await sb.from('emprestimos').select('id, doc').eq('estado', 'fora').eq('doc->cacifo->>uso_id', usoId);
+  if (error) return error;
+  for (const x of data || []) {
+    if (como === 'cancelado') { const r = await sb.from('emprestimos').delete().eq('id', x.id); if (r.error) return r.error; continue; }
+    const o = x.doc, ts = Date.now(), ev = { ts, colab: por, posto: por, itens: [], obs: 'Cacifo devolvido' };
+    o.res = o.res || {};
+    pendente(o).forEach(p => { const r = o.res[p.id] || (o.res[p.id] = { qtd: 0, nums: [] }); r.qtd += p.qtd; r.nums.push(...p.nums); ev.itens.push({ id: p.id, nome: p.nome, mod: p.mod, qtd: p.qtd, nums: p.nums }); });
+    o.devolucoes = [...(o.devolucoes || []), ev]; o.estado = 'devolvido'; o.devolvido = ts; o.colabRecebeu = por;
+    const r = await sb.from('emprestimos').update({ doc: o }).eq('id', x.id); if (r.error) return r.error;
+  }
+  return null;
+}
 
 /* ---------------- nova saída ---------------- */
 export async function novaSaida({ entregou = '', depois = () => {} } = {}) {

@@ -1,7 +1,7 @@
 // Planta do Sports Center (vertical), desenhada a partir do mapa da sinalética.
 // Coordenadas no sistema do mapa (x 30–340, y 30–800); no ecrã são percentagens,
 // por isso a planta escala com o espaço disponível. Números = sinalética dos campos.
-import { esc } from './core.js?v=25';
+import { esc } from './core.js?v=26';
 
 const OX = 30, OY = 30, VW = 310, VH = 770;
 const pct = ([x0, y0, x1, y1]) =>
