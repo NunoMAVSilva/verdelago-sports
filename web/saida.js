@@ -6,8 +6,8 @@
 // Guest/Proprietário e o check-out previsto vêm da lista de hóspedes (estadias); quem entrega/recebe/altera
 // é a pessoa com sessão iniciada. O email e a assinatura são apagados depois do check-out se a devolução
 // correu bem (função limpar_termos_material, migração 0011).
-import { sb, $, esc, hora, lisboa, hoje, addDias, dataCurta, normQuarto, dialogo, toast, erroTexto, carregarBase } from './core.js?v=26';
-import { numeroBadge } from './planta.js?v=26';
+import { sb, $, esc, hora, lisboa, hoje, addDias, dataCurta, normQuarto, dialogo, toast, erroTexto, carregarBase } from './core.js?v=27';
+import { numeroBadge } from './planta.js?v=27';
 
 // Igual ao DEFAULT_CFG da página Material (usado enquanto não houver "main" em material_config)
 const MODS = ['Padel', 'Ténis', 'Futebol', 'Futsal', 'Basquetebol', 'Voleibol', 'Material Diverso'];

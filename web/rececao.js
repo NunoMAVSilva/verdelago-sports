@@ -1,8 +1,8 @@
 // Painel da receção (#/rececao): login, grelha do dia, reservas/bloqueios, torneios, cacifos.
-import { planta, numeroBadge } from './planta.js?v=26';
-import { linhaTempo, limitesDia } from './linhatempo.js?v=26';
-import { novaSaida, alterarSaida, devolverSaida, pendente, avisoCheckout, htmlSeletor, seletorCacifo, emprestimoCacifo, fecharEmprestimoCacifo } from './saida.js?v=26';
-import { sb, $, $$, esc, autoAtualizar, normQuarto, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, carregarBase, erroTexto, toast, dialogo, confirmar, grelha, LOGO, ocupado } from './core.js?v=26';
+import { planta, numeroBadge } from './planta.js?v=27';
+import { linhaTempo, limitesDia } from './linhatempo.js?v=27';
+import { novaSaida, alterarSaida, devolverSaida, pendente, avisoCheckout, htmlSeletor, seletorCacifo, emprestimoCacifo, fecharEmprestimoCacifo } from './saida.js?v=27';
+import { sb, $, $$, esc, autoAtualizar, normQuarto, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, carregarBase, erroTexto, toast, dialogo, confirmar, grelha, LOGO, ocupado } from './core.js?v=27';
 
 let ultImport = null, B = null, dia = hoje(), aba = 'campos', filtro = '', selCampo = null, materialFora = [], checkouts = {}, itens = [], cacifos = [], usosAtivos = [], porPreparar = [], naoDevolvidos = [], torneios = [], app = null, staffNome = '';
 
