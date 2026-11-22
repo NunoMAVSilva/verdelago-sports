@@ -6,7 +6,8 @@
 // Guest/Proprietário e o check-out previsto vêm da lista de hóspedes (estadias); quem entrega/recebe/altera
 // é a pessoa com sessão iniciada. O email e a assinatura são apagados depois do check-out se a devolução
 // correu bem (função limpar_termos_material, migração 0011).
-import { sb, $, esc, hora, lisboa, hoje, addDias, dataCurta, normQuarto, dialogo, toast, erroTexto } from './core.js?v=24';
+import { sb, $, esc, hora, lisboa, hoje, addDias, dataCurta, normQuarto, dialogo, toast, erroTexto, carregarBase } from './core.js?v=25';
+import { numeroBadge } from './planta.js?v=25';
 
 // Igual ao DEFAULT_CFG da página Material (usado enquanto não houver "main" em material_config)
 const MODS = ['Padel', 'Ténis', 'Futebol', 'Futsal', 'Basquetebol', 'Voleibol', 'Material Diverso'];
@@ -71,13 +72,14 @@ export async function estadiaDe(quarto) {
   return (data || []).find(e => e.chegada <= h && e.partida >= h) || (data || [])[0] || null;
 }
 // Texto e gravidade do check-out face ao material ainda fora
+const diaMes = dia => { const [y, m, d] = dia.split('-').map(Number); return new Intl.DateTimeFormat('pt-PT', { timeZone: 'UTC', day: 'numeric', month: 'long' }).format(new Date(Date.UTC(y, m - 1, d))); };
 export function avisoCheckout(checkout) {
   if (!checkout) return null;
   const h = hoje();
-  if (checkout < h) return { cls: 'bad', txt: `Check-out já feito (${dataCurta(checkout)})` };
+  if (checkout < h) return { cls: 'bad', txt: `Check-out já feito (${diaMes(checkout)})` };
   if (checkout === h) return { cls: 'bad', txt: 'Check-out hoje' };
   if (checkout === addDias(h, 1)) return { cls: 'warn', txt: 'Check-out amanhã' };
-  return { cls: 'ok', txt: `Check-out ${dataCurta(checkout)}` };
+  return { cls: 'ok', txt: `Check-out a ${diaMes(checkout)}` };
 }
 
 async function carregar() {
@@ -138,7 +140,7 @@ export async function novaSaida({ entregou = '', depois = () => {} } = {}) {
   let M; try { M = await carregar(); } catch (e) { toast(erroTexto(e), 'erro'); return; }
   const F = { quarto: '', tipo: null, checkout: null, abertas: [], cesto: {}, prazo: '90', outro: '' };
 
-  dialogo(`<div class="row between"><h3>Nova saída de material</h3><button type="button" class="btn ghost small" data-fechar>Fechar</button></div>
+  dialogo(`<div class="row between"><h3>Nova saída de material</h3><span class="row"><span class="small muted">Passo 1 de 3</span><button type="button" class="btn ghost small" data-fechar>Fechar</button></span></div>
     <form class="stack" id="f-saida" autocomplete="off">
       <div class="sd-quarto"><label class="f" for="sd-q">Quarto<input id="sd-q" maxlength="8" placeholder="A111" autocapitalize="characters" required></label><div id="sd-tipo" class="sd-tipo" aria-live="polite"></div></div>
       <div id="sd-aviso" hidden></div>
@@ -212,10 +214,10 @@ export async function novaSaida({ entregou = '', depois = () => {} } = {}) {
 
 // Passo 2: o hóspede escreve o email (opcional) e assina o termo; ou recusa assinar
 function termo(d, fechar, doc, depois) {
-  let lg = 'pt', tinta = false;
+  const lg = 'en'; let tinta = false; // o termo aparece sempre em português e inglês
   const txt = k => TX[k].pt + (lg === 'pt' ? '' : ' · ' + TX[k][lg]);
   const termoTxt = l => TERMO[l].replace(/\{hora\}/g, hora(doc.prevista)).replace(/\{quarto\}/g, doc.quarto);
-  d.innerHTML = `<div class="row between"><h3 id="tm-tit"></h3><div class="seg-lg" id="tm-lg"><button type="button" data-lg="pt">PT</button><button type="button" data-lg="en">EN</button></div></div>
+  d.innerHTML = `<div class="row between"><h3 id="tm-tit"></h3><span class="small muted">Passo 2 de 3</span></div>
     <div class="tm-res"><b>${esc(doc.quarto)}</b> <span class="sd-badge ${doc.tipo === 'Proprietário' ? 'prop' : ''} small">${esc(doc.tipo)}</span><div>${esc(doc.itens.map(i => `${i.qtd}× ${CURTO[i.mod] || i.mod} · ${i.nome}${i.nums.length ? ' (nº ' + i.nums.join(', ') + ')' : ''}`).join('; '))}</div><div><span id="tm-ate"></span> <b>${hora(doc.prevista)}</b></div></div>
     <div class="tm-texto" id="tm-texto"></div>
     <label class="f" for="tm-mail"><span id="tm-mail-l"></span><input type="email" id="tm-mail" inputmode="email" autocomplete="off" placeholder="nome@exemplo.com"></label>
@@ -223,12 +225,10 @@ function termo(d, fechar, doc, depois) {
       <div class="tm-pad"><canvas id="tm-cv"></canvas><span class="tm-ph" id="tm-ph"></span></div></div>
     <p class="small" style="margin:0;font-weight:600" id="tm-aceita"></p>
     <div class="err" id="tm-err" role="alert"></div>
-    <div class="row between"><button type="button" class="btn ghost" id="tm-recusa">Hóspede não quis assinar</button><span class="row"><button type="button" class="btn ghost" data-fechar>Cancelar</button><button type="button" class="btn" id="tm-ok">Assinar e registar</button></span></div>`;
-  const idioma = l => { lg = l; $$lg(); $('#tm-tit').textContent = txt('titulo'); $('#tm-ate').textContent = txt('ate'); $('#tm-mail-l').textContent = txt('mail'); $('#tm-ass-l').textContent = txt('ass'); $('#tm-ph').textContent = txt('aqui'); $('#tm-aceita').textContent = txt('aceita');
+    <div class="row between"><button type="button" class="btn ghost" id="tm-recusa">Hóspede não quis assinar</button><span class="row"><button type="button" class="btn ghost" data-fechar>Cancelar</button><button type="button" class="btn" id="tm-ok">Assinar e continuar →</button></span></div>`;
+  const idioma = () => { $('#tm-tit').textContent = txt('titulo'); $('#tm-ate').textContent = txt('ate'); $('#tm-mail-l').textContent = txt('mail'); $('#tm-ass-l').textContent = txt('ass'); $('#tm-ph').textContent = txt('aqui'); $('#tm-aceita').textContent = txt('aceita');
     $('#tm-texto').innerHTML = [...new Set(['pt', lg])].map(k => `<div>${esc(termoTxt(k)).replace(/\n/g, '<br>')}</div>`).join(''); };
-  const $$lg = () => d.querySelectorAll('[data-lg]').forEach(b => b.setAttribute('aria-pressed', b.dataset.lg === lg));
-  $('#tm-lg').addEventListener('click', e => { const b = e.target.closest('[data-lg]'); if (b) idioma(b.dataset.lg); });
-  idioma('pt');
+  idioma();
   // quadro da assinatura
   const cv = $('#tm-cv'), dpr = devicePixelRatio || 1; cv.width = cv.clientWidth * dpr; cv.height = cv.clientHeight * dpr;
   const ctx = cv.getContext('2d');
@@ -241,13 +241,7 @@ function termo(d, fechar, doc, depois) {
   ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => cv.addEventListener(ev, () => { em = false; }));
   $('#tm-limpar').onclick = branco;
   const err = t => { $('#tm-err').textContent = t || ''; };
-  const gravar = async extra => {
-    const bs = [$('#tm-ok'), $('#tm-recusa')]; bs.forEach(b => { b.disabled = true; });
-    const { error } = await sb.from('emprestimos').insert({ id: novoId(), doc: { ...doc, ...extra, lang: lg } });
-    bs.forEach(b => { b.disabled = false; });
-    if (error) { err(erroTexto(error)); return; }
-    fechar(); toast(`Saída registada · ${doc.quarto} até ${hora(doc.prevista)}${extra.assinatura ? ' · assinada' : ''}`); depois();
-  };
+  const gravar = extra => campo(d, fechar, { ...doc, ...extra, lang: 'pt+en' }, depois);
   $('#tm-ok').onclick = () => {
     const mail = $('#tm-mail').value.trim();
     if (!tinta) { err('Falta a assinatura. Peça ao hóspede para assinar no quadro branco.'); return; }
@@ -256,6 +250,64 @@ function termo(d, fechar, doc, depois) {
     gravar({ assinatura: c2.toDataURL('image/png'), assinadoEm: Date.now(), aceitouCondicoes: true, condicoesTexto: [...new Set(['pt', lg])].map(termoTxt).join('\n\n'), email: mail, emailEstado: mail ? 'por enviar' : '' });
   };
   $('#tm-recusa').onclick = () => gravar({ assinaturaRecusada: true, email: $('#tm-mail').value.trim(), emailEstado: $('#tm-mail').value.trim() ? 'por enviar' : '' });
+}
+
+/* ---------------- passo 3: associar campo ---------------- */
+// Campos de cada modalidade de material (null = todos)
+const MOD_ESP = { Padel: ['padel'], 'Ténis': ['tenis'], Futebol: ['futebol', 'polidesportivo'], Futsal: ['polidesportivo', 'futebol'], Basquetebol: ['polidesportivo'], Voleibol: ['beach-volley'], 'Material Diverso': null };
+async function campo(d, fechar, doc, depois) {
+  let B = null; try { B = await carregarBase(); } catch { /* sem campos: só "Não associar" */ }
+  const tipos = new Set(); let todos = false;
+  (doc.modalidades || []).forEach(m => { const t = MOD_ESP[m]; if (!t) todos = true; else t.forEach(x => tipos.add(x)); });
+  const esps = (B?.espacos || []).filter(e => todos || tipos.has(e.modalidade));
+  const ini = new Date(), fim = new Date(doc.prevista);
+  let ocup = [];
+  if (esps.length) {
+    const { data } = await sb.from('reservas').select('espaco_id, inicio, fim').eq('estado', 'confirmada').in('espaco_id', esps.map(e => e.id)).lt('inicio', fim.toISOString()).gt('fim', ini.toISOString()).order('inicio');
+    ocup = data || [];
+  }
+  let sel = null;
+  d.innerHTML = `<div class="row between"><h3>Associar campo</h3><span class="small muted">Passo 3 de 3</span></div>
+    <p class="small muted" style="margin:0">${esc(doc.quarto)} · das ${hora(ini)} às ${hora(fim)}. O campo fica ocupado enquanto o material estiver fora e é libertado quando for devolvido.</p>
+    ${esps.length ? `<div class="cp-grelha">${esps.map(e => { const o = ocup.filter(r => r.espaco_id === e.id);
+      return `<button type="button" class="cp" data-cp="${esc(e.id)}" ${o.length ? 'disabled' : ''}>${numeroBadge(e)}<span><b>${esc(e.nome)}</b><small>${o.length ? 'Ocupado ' + o.map(r => `${hora(r.inicio)}–${hora(r.fim)}`).join(', ') : 'Livre'}</small></span></button>`; }).join('')}</div>`
+      : '<p class="muted">Não há campos para estas modalidades.</p>'}
+    <div class="err" id="cp-err" role="alert"></div>
+    <div class="row between"><button type="button" class="btn ghost" data-fechar>Cancelar</button><span class="row"><button type="button" class="btn ghost" id="cp-nao">Não associar campo</button><button type="button" class="btn" id="cp-ok" disabled>Associar e registar</button></span></div>`;
+  d.querySelectorAll('[data-cp]').forEach(b => b.onclick = () => {
+    sel = b.dataset.cp; d.querySelectorAll('[data-cp]').forEach(x => x.setAttribute('aria-pressed', x === b));
+    const ok = $('#cp-ok'); ok.disabled = false; ok.textContent = `Associar ${esps.find(e => e.id === sel).nome} e registar`;
+  });
+  const err = t => { $('#cp-err').textContent = t || ''; };
+  const registar = async espId => {
+    const bs = [$('#cp-ok'), $('#cp-nao')]; bs.forEach(b => { b.disabled = true; });
+    const id = novoId(); let res = null;
+    if (espId) {
+      const r = await sb.from('reservas').insert({ espaco_id: espId, tipo: 'reserva', inicio: new Date().toISOString(), fim: fim.toISOString(), quarto: doc.quarto, apelido: 'Material',
+        origem: 'rececao', notas: 'Material do balcão: ' + doc.itens.map(i => `${i.qtd}× ${i.nome}`).join(', ') }).select('id').single();
+      if (r.error) { bs.forEach(b => { b.disabled = false; }); err(erroTexto(r.error)); return; }
+      res = r.data.id;
+    }
+    const nome = espId ? esps.find(e => e.id === espId).nome : '';
+    const { error } = await sb.from('emprestimos').insert({ id, doc: { ...doc, ...(espId ? { campo: { espaco_id: espId, nome, reserva_id: res } } : {}) } });
+    if (error) { if (res) await sb.from('reservas').delete().eq('id', res); bs.forEach(b => { b.disabled = false; }); err(erroTexto(error)); return; }
+    fechar(); toast(`Saída registada · ${doc.quarto} até ${hora(doc.prevista)}${nome ? ' · ' + nome : ''}${doc.assinatura ? ' · assinada' : ''}`); depois();
+  };
+  $('#cp-ok').onclick = () => { if (sel) registar(sel); };
+  $('#cp-nao').onclick = () => registar(null);
+}
+// Ao devolver tudo, o campo associado fica livre a partir de agora
+async function libertarCampo(doc) {
+  const id = doc.campo?.reserva_id; if (!id) return;
+  const { data: r } = await sb.from('reservas').select('inicio, fim, estado').eq('id', id).maybeSingle();
+  if (!r || r.estado !== 'confirmada') return;
+  const agora = new Date();
+  if (agora >= new Date(r.fim)) return;
+  const q = agora <= new Date(r.inicio)
+    ? sb.from('reservas').update({ estado: 'cancelada', cancelado_em: agora.toISOString() }).eq('id', id)
+    : sb.from('reservas').update({ fim: agora.toISOString() }).eq('id', id);
+  const { error } = await q;
+  if (error) toast('Material devolvido, mas o campo não foi libertado: ' + erroTexto(error), 'erro');
 }
 
 /* ---------------- alterar (corrigir ou acrescentar equipamento) ---------------- */
@@ -357,6 +409,7 @@ export async function devolverSaida(id, { por = '', depois = () => {} } = {}) {
         if (e2) toast('Devolução gravada, mas as avarias não: registe-as no separador Material.', 'erro');
       }
       if (error) { $('#dv-ok').disabled = false; $('#dv-err').textContent = erroTexto(error); return; }
+      if (!ainda) await libertarCampo(o);
       fechar(); toast(ainda ? `Devolução parcial · ${l.quarto} ainda tem material fora` : `Devolução registada · ${l.quarto}`); depois();
     };
   });
