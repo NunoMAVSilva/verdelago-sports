@@ -1,10 +1,10 @@
 // Router: #/ (reservar) · #/r/<token> (reserva) · #/rececao · #/torneio/<id> · #/tv · #/tv/torneio[/<id>]
-import { paginaReservar, paginaReserva } from './hospede.js?v=27';
-import { paginaRececao } from './rececao.js?v=27';
-import { paginaTV, pararTV } from './tv.js?v=27';
-import { paginaTorneio, paginaTVTorneio, pararTorneio } from './torneio.js?v=27';
-import { pararAuto, ocupado } from './core.js?v=27';
-import { pararRececao } from './rececao.js?v=27';
+import { paginaReservar, paginaReserva } from './hospede.js?v=28';
+import { paginaRececao } from './rececao.js?v=28';
+import { paginaTV, pararTV } from './tv.js?v=28';
+import { paginaTorneio, paginaTVTorneio, pararTorneio } from './torneio.js?v=28';
+import { pararAuto, ocupado } from './core.js?v=28';
+import { pararRececao } from './rececao.js?v=28';
 
 const app = document.getElementById('app');
 // App instalada (Chrome/Edge no Mac, ecrã principal): a da receção abre no painel.
@@ -16,8 +16,8 @@ if (instalada && !location.hash.replace(/^#\/?/, '')) {
 // Manifesto da app consoante a página: painel da receção / torneios / TV abrem no painel; a página dos hóspedes abre nas reservas
 function manifesto(h) {
   const el = document.querySelector('link[rel="manifest"]'); if (!el) return;
-  const staff = /^(rececao|torneio\/|tv)/.test(h);
-  const href = staff ? 'manifest.webmanifest' : 'manifest-hospedes.webmanifest';
+  const staff = !(h === '' || h.startsWith('r/')); // página dos hóspedes: #/ e #/r/<token>
+  const href = staff ? 'manifest.webmanifest?v=2' : 'manifest-hospedes.webmanifest?v=2';
   if (el.getAttribute('href') !== href) el.setAttribute('href', href);
 }
 function rota() {
