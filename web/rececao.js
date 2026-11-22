@@ -1,7 +1,8 @@
 // Painel da receção (#/rececao): login, grelha do dia, reservas/bloqueios, torneios, cacifos.
-import { planta, numeroBadge } from './planta.js?v=22';
-import { linhaTempo, limitesDia } from './linhatempo.js?v=22';
-import { sb, $, $$, esc, autoAtualizar, normQuarto, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, carregarBase, erroTexto, toast, dialogo, confirmar, grelha, LOGO, ocupado } from './core.js?v=22';
+import { planta, numeroBadge } from './planta.js?v=23';
+import { linhaTempo, limitesDia } from './linhatempo.js?v=23';
+import { novaSaida } from './saida.js?v=23';
+import { sb, $, $$, esc, autoAtualizar, normQuarto, lisboa, hoje, addDias, min2hm, hora, dataLonga, dataCurta, diaDe, carregarBase, erroTexto, toast, dialogo, confirmar, grelha, LOGO, ocupado } from './core.js?v=23';
 
 let ultImport = null, B = null, dia = hoje(), aba = 'campos', filtro = '', selCampo = null, materialFora = [], itens = [], cacifos = [], usosAtivos = [], porPreparar = [], naoDevolvidos = [], torneios = [], app = null, staffNome = '';
 
@@ -114,6 +115,10 @@ function desenhar() {
   ligar();
 }
 
+// Nova saída de material (Home → Material em utilização, ou o botão do balcão dentro do separador Material)
+const abrirSaida = () => novaSaida({ entregou: staffNome, depois: () => { if (aba !== 'material') recarregar(true); } });
+addEventListener('message', e => { if (e.origin === location.origin && e.data?.tipo === 'nova-saida' && app?.isConnected && location.hash === '#/rececao') abrirSaida(); });
+
 /* ---------- material: a página do balcão (material/) dentro do painel ---------- */
 function vMaterial() { return '<iframe class="mat-frame" id="mat-frame" src="material/?embed=1" title="Material desportivo"></iframe>'; }
 function ligarMaterial() {
@@ -190,13 +195,12 @@ function postits(agora) {
     fora.push({ tipo: 'balcao', id: x.id, quarto: d.quarto, ate: d.prevista, desde: d.saida,
       linhas: (d.itens || []).map(i => `<b>${i.qtd}×</b> ${esc(i.nome)}${(i.nums || []).length ? ` <span class="nb">${i.nums.map(n => `<span>${n}</span>`).join('')}</span>` : ''}`),
       meta: `Balcão · saiu ${hora(d.saida)}${d.colabEntregou ? ' · ' + esc(d.colabEntregou.split(' ')[0]) : ''}` }); });
-  if (!fora.length) return '';
   const sev = f => !f.ate ? 'ok' : t > f.ate ? 'bad' : f.ate - t < 30 * 60e3 ? 'warn' : 'ok';
   const ordem = { bad: 0, warn: 1, ok: 2 };
   fora.sort((a, b) => ordem[sev(a)] - ordem[sev(b)] || (a.ate || 0) - (b.ate || 0));
   const nAtr = fora.filter(f => sev(f) === 'bad').length;
-  return `<section class="card stack"><div class="row between"><h2>Material fora</h2><span class="row"><span class="chip">${fora.length} registo${fora.length > 1 ? 's' : ''}</span>${nAtr ? `<span class="chip est-atraso">${nAtr} em atraso</span>` : ''}</span></div>
-    <div class="postits">${fora.map(f => { const s = sev(f);
+  return `<section class="card stack"><div class="row between"><h2>Material em utilização</h2><span class="row">${fora.length ? `<span class="chip">${fora.length} registo${fora.length > 1 ? 's' : ''}</span>` : ''}${nAtr ? `<span class="chip est-atraso">${nAtr} em atraso</span>` : ''}<button class="btn small" id="b-saida">+ Nova saída</button></span></div>
+    ${fora.length ? '' : '<p class="muted" style="margin:0">Sem material em utilização.</p>'}<div class="postits">${fora.map(f => { const s = sev(f);
       const pill = s === 'bad' ? `Atraso ${minutos(t - f.ate)}` : s === 'warn' ? `Faltam ${minutos(f.ate - t)}` : f.ate ? `Até ${hora(f.ate)}` : '';
       return `<article class="postit ${s}"><div class="r1"><span class="room">${esc(f.quarto)}</span>${pill ? `<span class="pill ${s}">${pill}</span>` : ''}</div>
         <div class="mat">${f.linhas.map(l => `<div>${l}</div>`).join('')}</div><div class="meta">${f.meta}</div>
@@ -207,7 +211,7 @@ function vCampos() {
   const est = B.espacos.map(e => estadoCampo(e, agora));
   const n = k => est.filter(x => x.cls === k).length;
   const seguir = itens.filter(r => new Date(r.inicio) > agora && new Date(r.inicio) - agora <= 2 * 3600e3).sort((a, b) => new Date(a.inicio) - new Date(b.inicio));
-  let lado = '';
+  let lado = '<div class="lado-linha">';
   if (sel) {
     const st = estadoCampo(sel, agora), its = itens.filter(r => r.espaco_id === sel.id).sort((a, b) => new Date(a.inicio) - new Date(b.inicio));
     lado += `<section class="card stack"><div class="row between"><h2 class="row" style="gap:10px">${numeroBadge(sel)}${esc(sel.nome)}</h2><span class="chip est-${st.cls}">${esc([st.txt, st.sub, st.extra].filter(Boolean).join(' · '))}</span></div>
@@ -220,12 +224,13 @@ function vCampos() {
   }
   lado += `<section class="card stack"><h2>A seguir <span class="muted small">· próximas 2 h</span></h2>
     ${seguir.length ? `<ul class="lista">${seguir.map(r => `<li><span><b>${hora(r.inicio)}</b> ${esc(nomeEsp(r.espaco_id))} · ${esc(rotulo(r))}${r.tipo === 'reserva' && r.precisa_material && !usoAtivo(r) ? ' <span class="chip warn">preparar material</span>' : ''}</span><button class="btn ghost small" data-item="${r.id}">Abrir</button></li>`).join('')}</ul>` : '<p class="muted" style="margin:0">Nada nas próximas 2 horas.</p>'}</section>`;
-  lado += postits(agora);
+  lado += '</div>' + postits(agora);
   return `<div class="campos-vista"><div class="campos-planta">${planta(B.espacos, e => estadoCampo(e, agora), selCampo)}
     <div class="legenda small"><span><i class="lg livre"></i>Livre</span><span><i class="lg uso"></i>Em uso</span><span><i class="lg tor"></i>Torneio</span><span><i class="lg blq"></i>Bloqueado</span><span><i class="lg atraso"></i>Material por devolver</span></div></div>
     <div class="campos-lado stack">${lado}</div></div>`;
 }
 function ligarCampos() {
+  const bs = $('#b-saida'); if (bs) bs.onclick = abrirSaida;
   $$('[data-campo]').forEach(b => b.onclick = () => { selCampo = selCampo === b.dataset.campo ? null : b.dataset.campo; desenhar(); });
   $$('.campos-lado [data-item]').forEach(b => b.onclick = () => detalhe(itens.find(r => r.id === b.dataset.item)));
   const f = $('[data-fechar-campo]'); if (f) f.onclick = () => { selCampo = null; desenhar(); };

@@ -1,10 +1,10 @@
 // Router: #/ (reservar) · #/r/<token> (reserva) · #/rececao · #/torneio/<id> · #/tv · #/tv/torneio[/<id>]
-import { paginaReservar, paginaReserva } from './hospede.js?v=22';
-import { paginaRececao } from './rececao.js?v=22';
-import { paginaTV, pararTV } from './tv.js?v=22';
-import { paginaTorneio, paginaTVTorneio, pararTorneio } from './torneio.js?v=22';
-import { pararAuto, ocupado } from './core.js?v=22';
-import { pararRececao } from './rececao.js?v=22';
+import { paginaReservar, paginaReserva } from './hospede.js?v=23';
+import { paginaRececao } from './rececao.js?v=23';
+import { paginaTV, pararTV } from './tv.js?v=23';
+import { paginaTorneio, paginaTVTorneio, pararTorneio } from './torneio.js?v=23';
+import { pararAuto, ocupado } from './core.js?v=23';
+import { pararRececao } from './rececao.js?v=23';
 
 const app = document.getElementById('app');
 function rota() {
